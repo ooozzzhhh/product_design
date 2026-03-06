@@ -1,0 +1,374 @@
+## IPS 接口管理与接口日志 — 现状调研（基于 release17 分支）
+
+**调研时间**：2026-03-04（已在 release17 分支补充代码调研）  
+**调研时间戳**：20260304145800  
+**代码来源与范围说明**：  
+- 代码仓库：`scp-foundation/scp-foundation`（本地路径 `c:\Users\OZH\Desktop\scp-foundation\scp-foundation`）  
+- 当前实际可见分支：`release17`（已从 `origin/release17` checkout，并以此作为本轮调研依据）。  
+- 前端实现范围：`scp-front/scp-ips-front` 中「接口管理」相关页面与 API（接口配置、接口同步控制、接口日志、场景接口数据）。  
+- 后端实现范围：`scp-dcp-api`、`scp-dcp-sdk`、`scp-dcp-service` 中与接口日志 `extApiLog`、接口配置 `ApiConfig`、中间表/场景数据 `ItfCommon`、枚举 `ApiSourceEnum` / `ApiCategoryEnum` 相关的代码。  
+- 数据库层面：目前仍**无法直接连通测试环境 MySQL**，但在 release17 分支中已经可以看到关键 Mapper（如 `ItfCommonDao.xml`）以及接口分类枚举中对表名的映射关系，因此对中间表和场景数据表结构的描述，已从“纯前端推测”升级为“基于 Mapper 与枚举的代码级结论 + 仍待实库确认的少量细节”。  
+
+> **重要限制与更新说明**：  
+> - 本文早期版本仅基于 `test` 分支前端代码做推测，认为「接口日志/场景接口数据」后端实现集中在 release17 且不可见；**该前提现已作废**。当前版本已在 `release17` 分支上实际查看 DCP 相关后端代码，包括：  
+>   - `extApiLog` 控制器 `ApiLogController` 与应用服务 `ApiLogServiceImpl`；  
+>   - 接口分类/来源枚举 `ApiCategoryEnum` / `ApiSourceEnum`；  
+>   - 中间表与场景数据访问层 `ItfCommonServiceImpl` 与 `ItfCommonDao.xml`（其中 `api_log_id` 字段及按接口分类映射到具体中间表如 `itf_erp_product` 的逻辑已经在代码中显式给出）。  
+> - 由于 DB 仍未直连，关于具体 DDL（字段类型、索引、分区/归档策略）的描述，依然以 Mapper 与枚举为依据，细节需在库表层再次核对；但关于“有哪些表”“如何通过 `api_log_id` 关联到中间表/场景数据”的结论，已经是 release17 代码级事实，而不再是 test 分支上的推测。  
+> - 如后续需要进一步精确到实库 DDL 与索引设计，建议在 DB 层补调研，并在本文新增「基于实库验证的补充章节」，与当前基于代码的结论做对比。
+
+---
+
+## 1. 现有功能结构与入口说明
+
+### 1.1 「一体化平台」下的接口管理菜单结构
+
+前端路由集中在 `scp-front/scp-ips-front/src/router/index.js` 中的 `/dc` 节点下，形成 IPS 一体化平台的二级菜单。与本次需求强相关的菜单为：
+
+- **接口配置**：  
+  - 路由：`/dc/system/api`  
+  - 组件：`@/views/dc/System/api/index.vue` → 下挂 `table1/table.vue`  
+  - 功能定位：配置外部接口（API）的元数据，包括接口来源、名称、分类等，并提供卡片式列表+新增/修改/删除操作。  
+  - 关键交互：  
+    - 查询条件：接口来源（`apiSource`）、接口名称（`apiName`）。  
+    - 列表项展示：接口名称、接口来源、接口分类编码、创建人。  
+    - 每个接口卡片上的动作：**日志**（跳转接口日志）、**控制**（跳转接口同步控制）、删除。
+
+- **接口同步控制**：  
+  - 路由：`/dc/system/apiSyncCtrl`  
+  - 组件：`@/views/dc/System/apiSyncCtrl/index.vue`（本轮只做位置识别，未深入逻辑）。  
+  - 功能定位（推测）：配置或查看接口调用调度/开关状态，如启停、频率等，与接口配置中的单条接口形成一对一或一对多关系。
+
+- **接口日志**：  
+  - 路由：`/dc/system/apiLog`  
+  - 一级容器组件：`@/views/dc/System/apiLog/index.vue`（通过 `yhl-lcdp` 低代码容器加载）  
+  - 内嵌表格组件：`@/views/dc/System/apiLog/table.vue`  
+  - 功能定位：集中展示接口调用的「运行日志」，包括请求/响应、批次信息、解析/应用数量、运行状态等，并支持详情抽屉查看请求/响应头体。
+
+- **场景接口数据**：  
+  - 路由：`/dc/system/sceneInterfaceData`  
+  - 一级容器组件：`@/views/dc/System/sceneInterfaceData/index.vue`  
+  - 内嵌表格组件：`@/views/dc/System/sceneInterfaceData/table.vue`  
+  - 功能定位：从业务场景（Scenario）视角，查看与某接口日志（`api_log_id`）相关联的「落地到场景库中的接口数据」，表结构由后端动态返回，用于观察接口在场景库中的写入结果。
+
+从用户视角看，「接口管理」四块功能在前端的职责大致为：
+
+- **接口配置**：定义「有哪些接口」，提供基础元数据与入口；  
+- **接口同步控制**：定义「什么时候、如何调用这些接口」；  
+- **接口日志**：查看一次或多次接口调用整体过程及结果（偏「调用侧」视角）；  
+- **场景接口数据**：按场景和接口日志 ID 查看具体入库数据（偏「数据落地」视角）。
+
+### 1.2 接口配置卡片视角与日志/控制跳转
+
+路径：`scp-front/scp-ips-front/src/views/dc/System/api/table1/table.vue`
+
+前端实现要点：
+
+- 查询表单字段：  
+  - 接口来源 `apiSource`（下拉：由 `getApiSource` 接口返回一组字符串）；  
+  - 接口名称 `apiName`（模糊输入）。  
+- 列表展示：采用卡片布局，每个卡片展示：  
+  - 编号 + 接口名称（`item.apiName`）；  
+  - 接口来源（`item.apiSource`）；  
+  - 接口分类编码（`item.apiCategory`）；  
+  - 创建人（`item.creatorName`）。  
+- 关键按钮：  
+  - **新增**：弹出 `FormDialog` 进行接口配置编辑。  
+  - **修改**：编辑当前选中接口配置。  
+  - **日志**：`viewLog(item)` 跳转到 `/dc/system/apiLog?apiLogId=${id}`。  
+  - **控制**：`controlItem(item)` 跳转到 `/dc/system/apiSyncCtrl?apiLogId=${id}`。  
+
+从交互上看，「接口配置」是其他三个子页面的入口，尤其是接口日志页面通过 URL `query.apiLogId` 来默认过滤特定接口的日志。
+
+---
+
+## 2. 代码实现位置与关键类/接口/表（基于当前可见代码）
+
+### 2.1 前端实现（IPS 前端工程）
+
+- **工程**：`scp-front/scp-ips-front`  
+- **菜单与路由**：  
+  - `src/router/index.js`：`/dc/system/api`、`/dc/system/apiSyncCtrl`、`/dc/system/apiLog`、`/dc/system/sceneInterfaceData` 等路由定义。  
+- **接口配置页面**：  
+  - 组件：`src/views/dc/System/api/index.vue` + `src/views/dc/System/api/table1/table.vue`  
+  - 接口调用：`@/api/dc/apiConfig`（`getApiConfig`、`deleteApiConfig`、`getApiSource` 等）。  
+  - 主要字段：`apiSource`、`apiName`、`apiCategory`、`creatorName` 等。  
+- **接口日志页面**：  
+  - 容器组件：`src/views/dc/System/apiLog/index.vue`（低代码容器 `yhl-lcdp`，将 `Table` 组件挂在 `C001` 容器上）。  
+  - 表格组件：`src/views/dc/System/apiLog/table.vue`  
+  - 接口调用：  
+    - `@/api/dc/apiLog.getApiLog` → `baseUrl.dcp + '/extApiLog/queryData'`（POST，分页+条件）  
+    - `@/api/dc/apiLog.viewApiLogDetail` → `baseUrl.dcp + '/extApiLog/detail/{id}'`（GET，详情，当前前端实现主要在列表中直接展示，不单独调用详情）  
+  - 使用的枚举：  
+    - 通过 `@/api/componentCommon.enums` 请求 `com.yhl.scp.common.enums.SyncDataStatusEnum`，将运行状态值转换为中文标签，用于筛选和展示。  
+- **场景接口数据页面**：  
+  - 容器组件：`src/views/dc/System/sceneInterfaceData/index.vue`  
+  - 表格组件：`src/views/dc/System/sceneInterfaceData/table.vue`  
+  - 接口调用：  
+    - `@/api/dc/sceneInterfaceData.getItfTableData` → `baseUrl.dcp + '/itf/getItfTableData'`（GET）  
+    - `@/api/componentCommon.fetchList` + URL `/scenario/page`：查询场景列表，用于场景下拉。  
+    - `@/api/dfpApi/dropdown.dropdownEnumData` 获取 `com.yhl.scp.dcp.enums.ApiSourceEnum`、`com.yhl.scp.dcp.enums.ApiCategoryEnum`（当前仓库中未找到该枚举定义，推测存在于 DCP 后端工程或其他分支）。  
+  - 表头/字段：由后端返回的 `tableColumns` 决定，前端对 `columnName == "api_log_id"` 的列单独设置更宽的宽度（250），暗示该字段为主关联维度。  
+  - 查询条件：接口分类 `apiCategory`、接口日志 ID `apiLogId`、场景 `scenario`（使用 `scenario.dataBaseName` 作为值）。
+
+### 2.2 后端实现现状（基于 release17 代码）
+
+在 `scp-foundation/scp-foundation` 根目录下，release17 分支中与本需求直接相关的后端实现主要集中在 DCP 工程：
+
+- **接口日志 extApiLog（DCP 日志侧）**  
+  - 控制器：`scp-dcp-sdk/src/main/java/com/yhl/scp/dcp/api/log/controller/ApiLogController.java`  
+    - 路由前缀：`/extApiLog`，包括：  
+      - `GET /extApiLog/page`：通用分页查询；  
+      - `GET /extApiLog/detail/{id}`：按 ID 查询单条接口日志；  
+      - `POST /extApiLog/queryData`：按条件分页查询主日志 + 子日志（供前端接口日志页面使用）；  
+      - `GET /extApiLog/interfaceWarning/{configId}`：按接口配置 ID 查询最新一条日志，用于预警。  
+  - 应用服务：`scp-dcp-sdk/src/main/java/com/yhl/scp/dcp/api/log/impl/ApiLogServiceImpl.java`  
+    - `queryData`：  
+      - 使用 PageHelper 按 `create_time desc` 分页；  
+      - 在查询参数中强制加入 `parentIdIsNull=YES`，只查主日志 PO；  
+      - 一次性查出所有主日志对应的子日志，并按 `parentId` 分组挂到 `childLogs` 字段；  
+      - 根据主日志的 `configId` 查询 `ApiConfigPO`，为（主+子）日志补齐 `apiName`、`apiCategory`、`apiSource` 字段；  
+      - 重新计算总数 `selectCountByParams(params)` 并写回 `PageInfo`。  
+    - `createLog` / `updateResponse`：  
+      - `createLog` 统一生成批次号 `batchNo`，设置 `syncScenarios`、`configId`、`triggerType`（自动/手工）、`parentId` 等；  
+      - 对于子日志，会继承主日志的 `requestType`、`resolveCount`，并写入子级请求头等字段；  
+      - `updateResponse` 在响应结束时更新 `responseTime`、`responseStatus`（成功/失败）、`resolveCount`（解析数量）和运行状态 `status`。  
+  - 持久层字段：`ApiLogPO` 明确了接口日志表字段，包括：  
+    - 结构信息：`parentId`、`configId`、`batchNo`、`subBatchNo`、`syncScenarios` 等；  
+    - 请求/响应：`requestType`、`triggerType`、`requestHeaders`、`requestParams`、`requestBody`、`responseHeaders`、`responseBody`、`responseStatus`、`requestTime`、`responseTime`；  
+    - 数量与状态：`resolveStatus`、`resolveCount`（解析数量）、`applyCount`（应用数量）、`status`（运行状态）；  
+    - 其他：请求流水号 `serialNum`、最近更新时间 `lastUpdateTime` 等。
+
+- **中间表与场景接口数据（DCP itf 公共服务）**  
+  - 服务实现：`scp-dcp-sdk/src/main/java/com/yhl/scp/dcp/itf/service/impl/ItfCommonServiceImpl.java`  
+    - `selectByPage(objectType, pagination, sortParam, queryCriteriaParam)`：  
+      - 使用 `EnumUtils.getMappingValueByCode(ApiCategoryEnum.class, objectType)` 从接口分类代码（如 `PRODUCT`、`ORDER`）解析出具体中间表表名（如 `itf_erp_product`、`itf_erp_work_order` 等）；  
+      - 将表名以 `${itfTable}` 形式传入 `ItfCommonDao.selectByCondition`，在相应中间表或视图上做分页查询。  
+  - Mapper：`scp-dcp-sdk/src/main/java/com/yhl/scp/dcp/itf/infrastructure/dao/ItfCommonDao.xml`  
+    - `BaseResultMap` / `Base_Column_List` 明确了通用中间表 PO `ItfCommonPO` 的字段：`id`、`api_log_id`、`data_body`、`valid`、`invalid_reason`；  
+    - `selectByParams` / `selectVOByParams` 等 SQL 展示了基于 `api_log_id` 与校验结果的条件查询方式；  
+    - `insertBatch` 等 SQL 使用 `${itfTable}` 与 `api_log_id` 字段批量写入中间表，说明中间表通过 `api_log_id` 与接口日志表建立一对多关联；  
+    - 从这些 SQL 可以确认：目前至少存在中间表 `itf_erp_product` 与视图 `v_itf_erp_product`，其它分类通过 `ApiCategoryEnum.mappingValue` 映射到不同的 `itf_...` 表。  
+  - 接口分类与来源枚举：`scp-dcp-api/src/main/java/com/yhl/scp/dcp/enums/ApiCategoryEnum.java`、`ApiSourceEnum.java`  
+    - `ApiCategoryEnum` 中 `mappingValue` 显式给出分类到中间表名的映射，例如：`PRODUCT("PRODUCT","物料信息","itf_erp_product")`、`ORDER("ORDER","订单信息","itf_erp_work_order")` 等；  
+    - `ApiSourceEnum` 定义 ERP / SAP / MES 等接口来源，与 IPS 前端下拉选项完全对应。
+
+- **与 IPS 工程的关系**  
+  - IPS 工程（`scp-ips-*`）在 release17 中仍主要提供平台级能力（登录、场景、统一报错规范等），接口管理的后端核心实现位于 DCP 工程；  
+  - IPS 前端通过 `baseUrl.dcp` 调用上述 DCP 接口（`/extApiLog/*`、`/itf/getItfTableData`），可以在 release17 代码中完整追踪到控制层、服务层与 Mapper 细节。
+
+---
+
+## 3. 外部系统 → 中间表 → 场景库 数据流（基于前端与命名的推测）
+
+> **提醒：本节为基于命名和交互的架构推测，非代码级实证。需要在切换到 `release17` 并拿到 DCP 后端代码或实际表结构后再次校验。**
+
+### 3.1 数据流关键节点与术语
+
+结合需求说明与现有前端字段，可以推测平台希望建立如下数据流视角：
+
+1. **外部系统调用接口**（通常由 DCP 统一接入）：  
+   - 入口：`extApiLog` 相关接口记录一次外部调用（请求 URL、请求头/体、响应状态、响应头/体、响应时间等）。  
+   - 关键字段（前端已使用）：  
+     - `apiName`、`apiCategory`、`apiSource`、`syncScenarios`、`requestType`、`triggerType`、`batchNo`、`subBatchNo`、`requestHeaders`、`requestParams`、`requestBody`、`responseHeaders`、`responseBody`、`responseStatus`、`resolveCount`、`applyCount`、`errorMessage`、`status` 等。  
+
+2. **写入中间表（集成层库）**：  
+   - 需求文档中提到「外部系统→中间表→场景库」两段，其中中间表一般位于 `scp_sds` 或专门的集成库中，用于暂存数据。  
+   - 现有前端中未直接暴露中间表表名或字段，仅通过 `resolveCount`（解析数量）与 `applyCount`（应用数量）暗示「从原始请求解析出的记录数」与「成功应用到场景的记录数」。  
+
+3. **分发到场景库**：  
+   - 「场景接口数据」页面通过 `apiCategory + apiLogId + scenario` 组合参数，调用 `/itf/getItfTableData`，返回某个接口日志在具体场景下对应的明细数据。  
+   - 返回结构中包含：  
+     - `tableColumns`：列名 `columnName` / 注释 `columnComment`，前端据此动态生成表头；  
+     - `results.list`：实际行数据；  
+     - 若存在 `api_log_id` 列，前端为其设置更大宽度，表明其为关键关联字段。  
+   - 结合 `scenarioOptions` 的来源（`/scenario/page`）可推测，这些数据落在各业务模块的场景库（如 `scp_sds`、`scp_sop` 等），但 DCP 以统一接口形式聚合查询。
+
+### 3.2 日志与数据之间的关联机制（推测）
+
+根据前端参数设计，可以归纳出一个隐含的关联模型：
+
+- 每一次外部接口调用在接口日志中形成一条或多条记录：  
+  - 顶层记录：代表一次「整体调用」，包含批次号、接口信息、总体解析/应用数量；  
+  - 子记录 `childLogs`：用于展现更细粒度的处理步骤，如多场景、多批次或多阶段（解析 vs 应用）。  
+- 「场景接口数据」则通过 `api_log_id` 反查与某次调用相关的业务表数据：  
+  - 一个 `api_log_id` 对应多张业务表或同一表多行记录；  
+  - `apiCategory` 决定了后端在 `getItfTableData` 中选择的底层视图/表和列集合；  
+  - `scenario` 决定了数据所在的场景库（`dataBaseName`），通过 DCP 在不同库之间切换查询。
+
+在当前实现中，**这三者的映射关系全部封装在 DCP 后端的不可见实现中**，前端仅作为查询入口和汇总展示。
+
+---
+
+## 4. 日志与异常处理现状（记录了什么 / 没记录什么）
+
+### 4.1 已能从前端确认的日志维度
+
+基于 `apiLog/table.vue`，接口日志当前前端期望展示的字段包括：
+
+- **标识与分组**：  
+  - `id`：接口日志 ID（树形主键，支持父子日志）；  
+  - `batchNo`：批次号；  
+  - `subBatchNo`：子批次号；  
+  - `apiName`：接口名称；  
+  - `apiCategory`：接口分类；  
+  - `syncScenarios`：同步场景（字符串）；  
+  - `apiSource`：接口来源。  
+
+- **调用特征**：  
+  - `requestType`：请求方式（GET/POST 等）；  
+  - `triggerType`：触发方式（定时/手动/事件触发等，具体值由 `SyncDataStatusEnum` 推断）；  
+  - `requestParams`：请求参数（简要）；  
+  - `requestHeaders` / `requestBody`：请求头/体（详情抽屉中展示）。  
+
+- **结果与性能**：  
+  - `responseStatus`：响应状态（前端将 `'true'` 映射成「成功」，`'false'` 映射成「失败」）；  
+  - `responseTime`：响应时间（精确到秒）；  
+  - `responseHeaders` / `responseBody`：响应头/体（详情抽局中展示）；  
+  - `resolveCount`：解析数量（推测为中间表落库/解析的记录数）；  
+  - `applyCount`：应用数量（推测为场景库成功应用的记录数）；  
+  - `status`：运行状态（使用 `SyncDataStatusEnum` 的值与标签映射，例如成功、失败、处理中等）；  
+  - `errorMessage`：错误信息（概要）。  
+
+从前端字段覆盖看，这一版接口日志**已经具备了较完整的「调用级别」可观测维度**，包括请求/响应、批次、数量统计等。
+
+### 4.2 当前实现中缺失或不明确的日志细节
+
+结合需求中对「外部系统→中间表→场景库」两阶段的诉求，本轮可识别的缺口主要集中在：
+
+- **阶段粒度不够显式**：  
+  - 前端表结构中没有明确的「阶段」字段来区分：  
+    - A 段：从外部系统获取数据并写入中间表；  
+    - B 段：从中间表分发/应用到场景库。  
+  - 解析数量/应用数量仅以数值形式给出，无法直接定位是 A 失败、B 失败，还是两者都有问题。  
+
+- **错误明细缺乏结构化维度**：  
+  - `errorMessage` 仅作为一个总的错误信息字段；  
+  - 无明显字段用于区分「请求失败（HTTP 层）」「解析失败（结构/格式问题）」「写入中间表失败」「写入场景库失败」「部分成功」等类型。  
+
+- **中间表与场景库表结构未在本仓库可见**：  
+  - 没有找到任何关于「接口中间表」或「接口数据场景表」的 entity/mapper/DDL 定义；  
+  - `sceneInterfaceData` 页面依赖后端返回动态列，前端仅将 `api_log_id` 特殊处理，其余列的业务含义完全依托后端。  
+
+- **跨库/跨场景的跟踪能力不清晰**：  
+  - `syncScenarios` 和 `scenario` 的具体取值及其与实际数据库库名/表名的映射关系，在当前分支代码中没有可见定义；  
+  - `api_log_id` 如何在不同库/表之间保持一致（是否为全局唯一 ID）也未在代码中体现。
+
+综上，**现状的接口日志主要解决了「调用级别的可观测性」问题，但对于「中间表写入 / 场景库分发」两个阶段的细粒度日志和错误分类，仍然严重依赖未可见的后端实现**，前端结构本身尚不足以支持清晰的阶段定位与问题溯源。
+
+---
+
+## 5. 与本次接口日志改造需求的能力差距与潜在影响点
+
+### 5.1 现状能力小结（基于可见实现）
+
+- **能看到的内容**：  
+  - 按接口、时间范围、运行状态维度查询接口调用日志；  
+  - 查看单次调用的请求/响应头体、批次号、解析/应用数量、错误信息；  
+  - 支持树形结构展示父子日志（通过 `childLogs` 字段），为后续扩展阶段或子任务日志留出了结构空间；  
+  - 通过场景接口数据页面，基于 `apiCategory + apiLogId + scenario` 维度查询对应场景库中的接口数据明细（列名和含义由后端动态提供）。
+
+- **能配置/控制的内容（从前端侧可见）**：  
+  - 接口配置：接口来源、名称、分类等元数据，以及对单条接口的新增/修改/删除；  
+  - 接口同步控制：从接口配置卡片跳转，前端有控制页面但当前分支未详细分析具体字段；  
+  - 日志查询：仅限于查看与筛选，未发现重试/重新执行等直接操作按钮。  
+
+### 5.2 与目标「清晰看到两阶段日志」之间的主要差距
+
+结合需求中强调的「无法清晰看到【外部系统→中间表→场景库】两步」痛点，与当前可见能力相比，主要存在以下差距：
+
+1. **阶段区分不够直观**：  
+   - 现有日志字段没有显式标记「阶段」，用户只能通过 `resolveCount` 与 `applyCount` 的数值差异进行猜测；  
+   - 没有用于定位「写入中间表」失败 vs 「从中间表应用到场景库」失败的独立状态/错误类型字段。
+
+2. **缺少行级/批次级错误明细展示入口**：  
+   - 当前接口日志展示的是调用级别的信息，错误信息为总体描述；  
+   - 若从中间表写入过程出现部分行失败、或场景库写入出现部分行失败，难以在日志层面直接看到具体哪一行/哪一批失败。  
+   - 场景接口数据虽然能展示结果数据，但前端未体现「失败记录」或「差异对比」的专门视图。
+
+3. **过滤/聚合维度有限**：  
+   - 已有维度：接口、时间范围、运行状态、（通过场景接口数据）接口分类+场景；  
+   - 缺少：按批次号、场景库表/对象、错误类型（解析 vs 应用）、外部调用来源系统等更多维度的过滤和聚合能力。
+
+4. **缺乏与平台统一报错/日志规范的联动**：  
+   - 现有接口日志方案在前端上与「IPS 平台报错规范化」的统一错误码、错误文案、traceId 等未建立可见的关联；  
+   - 日志中的 `errorMessage` 字段是否使用了统一文案规范，当前分支代码无法确认。
+
+5. **表结构与数据量影响不可控**：  
+   - 由于无法直连测试库，也未看到 DDL，无法评估：  
+     - 接口日志表/场景接口数据表的当前索引设计、分区策略；  
+     - 在引入更多维度（阶段、错误类型、traceId、批次级/行级明细）后，对表大小与查询性能的影响。  
+
+### 5.3 潜在影响点与风险提醒
+
+- **表膨胀与性能**：  
+  - 若为满足新需求引入行级错误记录或更细的阶段日志，有可能显著增加接口日志表和场景接口数据表的记录量；  
+  - 若没有合理的分区/归档/清理策略，长期运行后可能对查询性能造成影响。  
+
+- **跨库查询复杂度**：  
+  - 场景接口数据涉及不同业务库（`scp_sds`、`scp_sop` 等）和不同场景数据库（`scenario.dataBaseName`）；  
+  - 在 DCP 统一查询层之上再增加更多维度聚合，有可能需要更复杂的跨库视图或中间汇总表。  
+
+- **与统一日志/错误规范的对齐成本**：  
+  - 如果要在接口日志中统一呈现错误码、traceId，并与平台其他模块的错误规范保持一致，将要求 DCP/IPS 在调用链上补充和透传这些字段，改造范围可能涉及网关、common 包以及业务模块。  
+
+---
+
+## 6. 本轮 PRD 编写建议（面向产品经理）
+
+> 以下建议仅基于当前可见实现与需求目标推导，供 PRD 阶段参考；实际落地前建议由开发在 `release17` 或真实后端代码/DB 上再次验证可行性。
+
+1. **清晰定义「三级模块」划分与职责**  
+   - 建议在 PRD 中明确：  
+     - 一级：一体化平台（IPS）；  
+     - 二级：「接口管理」；  
+     - 三级：**接口配置 / 接口同步控制 / 接口日志 / 场景接口数据** 四个子模块，分别对齐本调研中的职责描述；  
+   - 在 PRD 的功能结构图中标出各子模块之间的跳转关系（例如：接口配置卡片 → 接口日志/接口同步控制）。
+
+2. **从产品视角拆解「两阶段」日志模型**  
+   - 建议在 PRD 中单独一节定义「接口调用阶段模型」，至少包括：  
+     - A 阶段：外部系统调用 → 请求/响应层面；  
+     - B 阶段：中间表解析与写入；  
+     - C 阶段：从中间表应用/分发到场景库；  
+   - 并为每个阶段定义：状态枚举、典型错误类型、建议的日志字段（含是否前端可见、是否仅限后端日志）。
+
+3. **明确定义接口日志页面需要呈现的关键字段和过滤维度**  
+   - 在现有字段基础上，建议在 PRD 中重点强调：  
+     - 必须可过滤的维度：接口、时间范围、运行状态、批次号、场景、阶段（A/B/C）、错误类型；  
+     - 必须清晰展示的字段：解析数量、应用数量、成功/失败/部分成功标记、错误码 + 错误信息、traceId（如全局规范允许）。  
+   - 对于「父/子日志」结构，应在 PRD 中明确：父节点代表什么（整体调用），子节点代表什么（按场景/按阶段/按重试等）。
+
+4. **为「场景接口数据」页面设计更贴合排查的视角**  
+   - 建议 PRD 在该页面的目标中强调：  
+     - 用户需要能够根据 `api_log_id + 场景` 一键看到本次调用在场景库中的全部相关记录；  
+     - 若存在中间表 vs 场景库的数据落差（如解析成功但应用失败），应有能力突出显示异常记录（例如高亮、单独 tab、“仅显示失败记录”开关）；  
+     - 如有可能，将「场景接口数据」和「接口日志」之间通过 `api_log_id` 实现跳转联动（从日志跳到场景数据，或反向跳回日志）。
+
+5. **在 PRD 中预先约束日志与数据量管理策略**  
+   - PRD 需引导技术设计考虑：  
+     - 接口日志与场景接口数据的保留周期（按天/月/年），是否支持归档或分库分表；  
+     - 是否需要对高频接口或大批量数据接口设置单独的采样/聚合方案；  
+     - 在产品层面对历史数据查询范围的约束（例如默认查询最近 7 天/30 天，超过一定时间需导出/归档）。
+
+6. **明确与「平台报错规范化」的衔接要求**  
+   - 建议在 PRD 中引用已有的「IPS 平台报错规范化优化」相关规范：  
+     - 要求接口日志中的错误信息遵循统一文案与错误码规范（不直接透传异常、避免技术堆栈暴露）；  
+     - 对于用户页面展示的错误提示，应采用简洁文案 + 错误码 + traceId 的组合，由接口日志和后端日志提供详细技术信息。  
+   - 如有必要，扩展一小节说明「接口日志/接口数据」如何复用现有错误规范中的错误码和枚举。
+
+7. **在 PRD 中显式标明对 release17/后端实现的依赖**  
+   - 鉴于本轮调研无法看到 DCP 后端与真实 DB 表结构，建议在 PRD 的「实现依赖」或「约束条件」章节中：  
+     - 明确写出：后端接口 `/extApiLog/*`、`/itf/getItfTableData` 及相关表结构目前仅在 `release17` 或其他内部工程中存在；  
+     - 将「确认现有实现细节」列为开发/架构方需要配合完成的前置任务（如提供 DDL、接口文档、示意表结构等）。
+
+8. **预留对「重试/补偿」能力的扩展空间**  
+   - 虽然当前前端未提供重试按钮，但在 PRD 中建议预留：  
+     - 是否需要对失败的批次或单条记录提供「重试/补发」能力；  
+     - 若需要，应在接口日志/场景接口数据中提供必要的筛选条件和安全约束（例如只对特定状态、指定时间范围、或由管理员操作）。  
+
+---
+
+> **后续工作提示**：  
+> - 当主会话或产品经理完成对 `release17` 分支的代码/环境准备后，建议再次调用产品经理对 DCP/IPS 后端实现与实际数据库表结构进行二次调研，并在本知识库文档中新增「基于 release17 验证的补充章节」，与本次基于 test 分支的初步结论做对比。  
+> - 在此之前，PRD 编写阶段应将本次调研结论视为「方向性参考」，避免在技术细节（具体表名、字段类型等）上做过度假设。  
+

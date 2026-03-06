@@ -1,0 +1,5 @@
+{
+  "name": "MRP运行界面",
+  "description": "一个功能齐全的ERP客户订单管理原型，具有实时MRP计算进度显示和AI驱动的物料分析报告。",
+  "requestFramePermissions": []
+}

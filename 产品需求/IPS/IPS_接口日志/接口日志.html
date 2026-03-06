@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>接口日志 - IPS DCP</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --page-bg: #ffffff;
+      --card-bg: #ffffff;
+      --card-border: #e2e8f0;
+      --header-bg: #f8fafc;
+      --primary: #0ea5e9;
+      --primary-hover: #38bdf8;
+      --primary-light: rgba(14, 165, 233, 0.08);
+      --accent: #0ea5e9;
+      --success: #22c55e;
+      --success-bg: rgba(34, 197, 94, 0.1);
+      --error: #ef4444;
+      --error-bg: rgba(239, 68, 68, 0.1);
+      --warn: #f59e0b;
+      --text: #1e293b;
+      --text-muted: #64748b;
+      --radius: 10px;
+      --radius-sm: 6px;
+      --shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+      --shadow-hover: 0 4px 12px rgba(14, 165, 233, 0.15);
+      --transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--page-bg); color: var(--text); font-family: 'Outfit', 'Noto Sans SC', sans-serif; font-size: 14px; line-height: 1.5; min-height: 100vh; }
+
+    .app { min-height: 100vh; display: flex; flex-direction: column; }
+
+    /* 顶部标题与 Tab */
+    .page-top { background: var(--card-bg); border-bottom: 1px solid var(--card-border); padding: 0 24px; }
+    .page-top-title { font-size: 1.25rem; font-weight: 700; color: var(--text); padding: 20px 0 0; margin: 0; }
+    .tabs { display: flex; gap: 4px; margin-top: 16px; }
+    .tab { padding: 12px 20px; font-weight: 500; color: var(--text-muted); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: var(--transition); font-size: 14px; }
+    .tab:hover { color: var(--primary); }
+    .tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+
+    /* 主内容区 */
+    .main { flex: 1; padding: 24px 32px; overflow-y: auto; }
+
+    /* 面包屑 */
+    .breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-muted); margin-bottom: 20px; }
+    .breadcrumb span { cursor: pointer; }
+    .breadcrumb span:hover { color: var(--primary); }
+    .breadcrumb .sep { color: var(--card-border); }
+    .breadcrumb .current { color: var(--text); font-weight: 500; }
+
+    /* 页面标题 */
+    .page-header { margin-bottom: 24px; }
+    .page-title { font-size: 1.5rem; font-weight: 700; color: var(--text); margin: 0 0 8px 0; letter-spacing: -0.02em; }
+    .page-desc { font-size: 13px; color: var(--text-muted); margin: 0; }
+
+    /* 筛选栏 */
+    .toolbar { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--radius); padding: 16px 20px; margin-bottom: 20px; display: flex; flex-wrap: wrap; align-items: center; gap: 16px; }
+    .toolbar label { font-weight: 500; color: var(--text-muted); font-size: 13px; }
+    .toolbar select, .toolbar input { padding: 8px 14px; border: 1px solid var(--card-border); border-radius: var(--radius-sm); background: var(--page-bg); color: var(--text); font-family: inherit; font-size: 13px; min-width: 140px; }
+    .toolbar select option, .toolbar input::placeholder { color: var(--text-muted); }
+    .toolbar select:focus, .toolbar input:focus { outline: none; border-color: var(--primary); }
+    .toolbar .btn { padding: 8px 18px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 500; cursor: pointer; border: none; font-family: inherit; transition: var(--transition); }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-hover); transform: translateY(-1px); }
+    .btn-ghost { background: transparent; color: var(--text-muted); border: 1px solid var(--card-border); }
+    .btn-ghost:hover { color: var(--primary); border-color: var(--primary); }
+    .btn-link-sm { display: inline-block; padding: 6px 14px; border-radius: 8px; font-size: 12px; font-weight: 500; cursor: pointer; border: 1px solid var(--primary); background: rgba(14, 165, 233, 0.08); color: var(--primary); font-family: inherit; transition: var(--transition); }
+    .btn-link-sm:hover { background: var(--primary-light); border-color: var(--primary-hover); color: var(--primary-hover); }
+
+    /* 统计卡片 */
+    .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px; }
+    .stat-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--radius); padding: 18px 20px; transition: var(--transition); }
+    .stat-card:hover { border-color: var(--primary); box-shadow: var(--shadow-hover); }
+    .stat-card.clickable { cursor: pointer; }
+    .stat-label { font-size: 12px; color: var(--text-muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.04em; }
+    .stat-value { font-family: 'JetBrains Mono', monospace; font-size: 1.5rem; font-weight: 600; }
+    .stat-value.success { color: var(--success); }
+    .stat-value.error { color: var(--error); }
+    .stat-value.warn { color: var(--warn); }
+    .stat-value.primary { color: var(--primary); }
+    .stat-unit { font-size: 0.7em; font-weight: 500; color: var(--text-muted); margin-left: 2px; }
+    .stat-sub { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+    .stat-sub.success { color: var(--success); }
+    .stat-card-export { background: var(--card-bg); border: 2px dashed var(--primary); border-radius: var(--radius); padding: 18px 20px; cursor: pointer; transition: var(--transition); display: flex; align-items: center; justify-content: center; min-height: 88px; }
+    .stat-card-export:hover { background: var(--primary-light); border-color: var(--primary); border-style: solid; box-shadow: var(--shadow-hover); }
+    .stat-card-export .export-text { font-size: 14px; font-weight: 600; color: var(--primary); }
+    .stat-card-export:hover .export-text { color: var(--primary-hover); }
+
+    /* 表格 */
+    .table-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--radius); overflow: hidden; }
+    .table-wrap { overflow-x: auto; max-height: 480px; overflow-y: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { background: var(--header-bg); font-weight: 600; padding: 12px 16px; text-align: left; color: var(--text-muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.03em; border-bottom: 1px solid var(--card-border); }
+    td { padding: 12px 16px; border-bottom: 1px solid #f1f5f9; }
+    tr:hover td { background: var(--primary-light); }
+    tr.clickable { cursor: pointer; }
+    tr.clickable:hover td { background: var(--primary-light); }
+    .status-dot { display: inline-flex; align-items: center; gap: 6px; }
+    .status-dot::before { content: ''; width: 6px; height: 6px; border-radius: 50%; }
+    .status-dot.success::before { background: var(--success); }
+    .status-dot.error::before { background: var(--error); }
+    .status-dot.warn::before { background: var(--warn); }
+    .status-dot.pending::before { background: var(--text-muted); }
+    .link { color: var(--primary); cursor: pointer; }
+    .link:hover { text-decoration: underline; }
+
+    /* 弹窗/抽屉 */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.35); z-index: 1000; display: flex; justify-content: flex-end; align-items: stretch; opacity: 0; visibility: hidden; transition: var(--transition); }
+    .modal-overlay.visible { opacity: 1; visibility: visible; }
+    .drawer { width: 560px; max-width: 90vw; background: var(--card-bg); border-left: 1px solid var(--card-border); box-shadow: -8px 0 32px rgba(0, 0, 0, 0.12); transform: translateX(100%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); display: flex; flex-direction: column; }
+    .drawer.drawer-wide { width: 680px; }
+    .modal-overlay.visible .drawer { transform: translateX(0); }
+    .drawer-header { padding: 20px 24px; border-bottom: 1px solid var(--card-border); display: flex; justify-content: space-between; align-items: center; }
+    .drawer-title { font-size: 1.1rem; font-weight: 600; margin: 0; }
+    .drawer-close { width: 36px; height: 36px; border: none; background: transparent; color: var(--text-muted); cursor: pointer; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; font-size: 20px; transition: var(--transition); }
+    .drawer-close:hover { background: var(--header-bg); color: var(--text); }
+    .drawer-body { padding: 24px; overflow-y: auto; flex: 1; }
+    .detail-row { display: flex; margin-bottom: 16px; }
+    .detail-row:last-child { margin-bottom: 0; }
+    .detail-label { width: 120px; flex-shrink: 0; color: var(--text-muted); font-size: 13px; }
+    .detail-value { flex: 1; font-family: 'JetBrains Mono', monospace; font-size: 12px; word-break: break-all; }
+    .detail-block { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--card-border); }
+    .detail-block-title { font-size: 12px; color: var(--text-muted); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.04em; }
+    .code-block { background: var(--header-bg); border: 1px solid var(--card-border); border-radius: var(--radius-sm); padding: 14px; font-family: 'JetBrains Mono', monospace; font-size: 11px; max-height: 200px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; color: var(--text); position: relative; }
+    .code-block-wrap { position: relative; }
+    .code-block-wrap .code-block { padding-right: 44px; }
+    .copy-btn { position: absolute; top: 8px; right: 8px; width: 28px; height: 28px; border: none; background: var(--header-bg); border-radius: var(--radius-sm); cursor: pointer; color: var(--text-muted); display: flex; align-items: center; justify-content: center; font-size: 14px; transition: var(--transition); z-index: 1; }
+    .copy-btn:hover { background: var(--primary-light); color: var(--primary); }
+    .copy-btn::before { content: '⎘'; font-size: 12px; }
+    .error-summary-bar.success { background: var(--success-bg); border: 1px solid rgba(34, 197, 94, 0.25); color: var(--success); }
+
+    /* 错误明细列表 */
+    .error-list { margin-top: 12px; }
+    .error-list-wrap { max-height: 320px; overflow-y: auto; }
+    .error-item { background: var(--error-bg); border: 1px solid rgba(239, 68, 68, 0.25); border-radius: var(--radius-sm); padding: 12px 14px; margin-bottom: 8px; font-size: 12px; }
+    .error-item:last-child { margin-bottom: 0; }
+    .error-item .err-row { display: flex; gap: 8px; margin-bottom: 4px; }
+    .error-item .err-row:last-child { margin-bottom: 0; }
+    .error-item .err-key { color: var(--text-muted); min-width: 80px; }
+    .error-item .err-msg { color: var(--error); }
+    .error-summary-bar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; padding: 10px 14px; background: var(--error-bg); border-radius: var(--radius-sm); font-size: 12px; }
+    .error-summary-bar .export-btn { padding: 6px 12px; font-size: 12px; }
+
+    /* 下钻视图 */
+    .drill-view { display: none; }
+    .drill-view.active { display: block; animation: fadeIn 0.25s ease; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .back-bar { display: inline-flex; align-items: center; gap: 8px; color: var(--primary); cursor: pointer; margin-bottom: 20px; font-size: 13px; }
+    .back-bar:hover { text-decoration: underline; }
+
+
+    /* 空状态 */
+    .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+    .empty-state .icon { font-size: 48px; margin-bottom: 16px; opacity: 0.5; }
+
+    /* 分页 */
+    .pagination { display: flex; justify-content: space-between; align-items: center; padding: 12px 20px; border-top: 1px solid var(--card-border); background: var(--header-bg); }
+    .pagination-info { font-size: 13px; color: var(--text-muted); }
+    .pagination-btns { display: flex; gap: 8px; }
+    .pagination-btns button { padding: 6px 12px; border: 1px solid var(--card-border); background: transparent; color: var(--text); border-radius: var(--radius-sm); cursor: pointer; font-size: 13px; }
+    .pagination-btns button:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); }
+    .pagination-btns button:disabled { opacity: 0.4; cursor: not-allowed; }
+    .pagination-btns button.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+  </style>
+</head>
+<body>
+<div class="app">
+  <!-- 顶部标题与 Tab -->
+  <div class="page-top">
+    <h1 class="page-top-title">接口日志</h1>
+    <div class="tabs">
+      <div class="tab active" data-view="overview">概览</div>
+      <div class="tab" data-view="outbound">从外部获取数据</div>
+      <div class="tab" data-view="inbound">向外部提供数据</div>
+      <div class="tab" data-view="storage">中间表</div>
+      <div class="tab" data-view="distribution">场景库分发</div>
+    </div>
+  </div>
+
+  <!-- 主内容 -->
+  <main class="main">
+    <!-- 概览页 -->
+    <div id="view-overview" class="drill-view active">
+      <div class="page-header">
+        <h1 class="page-title">数据概览</h1>
+        <p class="page-desc">统一查看 DCP 接口日志、入库与分发处理明细</p>
+      </div>
+      <div class="stats-row">
+        <div class="stat-card clickable" data-nav="outbound">
+          <div class="stat-label">从外部获取数据（今日）</div>
+          <div class="stat-value primary" id="overview-outbound">0 <span class="stat-unit">次</span></div>
+          <div class="stat-sub" id="overview-outbound-sub">成功 0 次 · 失败 0 次</div>
+        </div>
+        <div class="stat-card clickable" data-nav="inbound">
+          <div class="stat-label">向外部提供数据（今日）</div>
+          <div class="stat-value primary" id="overview-inbound">0 <span class="stat-unit">次</span></div>
+          <div class="stat-sub" id="overview-inbound-sub">成功 0 次 · 失败 0 次</div>
+        </div>
+        <div class="stat-card clickable" data-nav="storage">
+          <div class="stat-label">中间表（今日）</div>
+          <div class="stat-value" id="overview-storage">0 <span class="stat-unit">行</span></div>
+          <div class="stat-sub success" id="overview-storage-sub">成功 0 行 · 失败 0 行</div>
+        </div>
+        <div class="stat-card clickable" data-nav="distribution">
+          <div class="stat-label">场景库分发（今日）</div>
+          <div class="stat-value" id="overview-dist">0 <span class="stat-unit">行</span></div>
+          <div class="stat-sub" id="overview-dist-sub">成功 0 行 · 失败 0 行</div>
+        </div>
+      </div>
+      <div class="table-card">
+        <div style="padding: 16px 20px; border-bottom: 1px solid var(--card-border);">
+          <strong>最近调用记录</strong>
+          <span style="margin-left: 12px; font-size: 12px; color: var(--text-muted);">点击行可查看详情</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>类型</th>
+                <th>接口名称</th>
+                <th>批次号</th>
+                <th>状态</th>
+                <th>解析/应用</th>
+                <th>时间</th>
+              </tr>
+            </thead>
+            <tbody id="overview-tbody"></tbody>
+          </table>
+        </div>
+        <div class="pagination">
+          <span class="pagination-info" id="overview-page-info">共 0 条</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 从外部获取数据 -->
+    <div id="view-outbound" class="drill-view">
+      <div class="page-header">
+        <h1 class="page-title">从外部获取数据</h1>
+        <p class="page-desc">向外部系统发起请求并接收数据的调用日志</p>
+      </div>
+      <div class="toolbar">
+        <label>接口名称</label>
+        <select id="outbound-api"><option value="">全部</option><option value="ERP-物料主数据">ERP-物料主数据</option><option value="ERP-客户信息">ERP-客户信息</option></select>
+        <label>时间范围</label>
+        <input type="datetime-local" id="outbound-start" value="2025-03-02T00:00:00" />
+        <span>至</span>
+        <input type="datetime-local" id="outbound-end" value="2025-03-02T23:59:59" />
+        <label>状态</label>
+        <select id="outbound-status"><option value="">全部</option><option value="success">成功</option><option value="fail">失败</option></select>
+        <button class="btn btn-primary" id="btn-query-outbound">查询</button>
+        <button class="btn btn-ghost" id="btn-reset-outbound">重置</button>
+      </div>
+      <div class="stats-row">
+        <div class="stat-card"><div class="stat-label">总调用次数</div><div class="stat-value primary" id="outbound-total">0 <span class="stat-unit">次</span></div></div>
+        <div class="stat-card"><div class="stat-label">成功</div><div class="stat-value success" id="outbound-success">0 <span class="stat-unit">次</span></div></div>
+        <div class="stat-card"><div class="stat-label">失败</div><div class="stat-value error" id="outbound-fail">0 <span class="stat-unit">次</span></div></div>
+        <div class="stat-card"><div class="stat-label">平均响应</div><div class="stat-value" id="outbound-avg">—</div></div>
+      </div>
+      <div class="table-card">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>序号</th>
+                <th>接口名称</th>
+                <th>批次号</th>
+                <th>请求方式</th>
+                <th>响应状态</th>
+                <th>解析/应用</th>
+                <th>响应时间</th>
+                <th>错误信息</th>
+                <th>重试</th>
+                <th>创建时间</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="outbound-tbody"></tbody>
+          </table>
+        </div>
+        <div class="pagination">
+          <span class="pagination-info" id="outbound-page-info">共 0 条</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 向外部提供数据 -->
+    <div id="view-inbound" class="drill-view">
+      <div class="page-header">
+        <h1 class="page-title">向外部提供数据</h1>
+        <p class="page-desc">外部系统向本系统发起请求，本系统返回数据的日志</p>
+      </div>
+      <div class="toolbar">
+        <label>接口名称</label>
+        <select id="inbound-api"><option value="">全部</option><option value="MES-生产订单回传">MES-生产订单回传</option><option value="WMS-库存回传">WMS-库存回传</option></select>
+        <label>时间范围</label>
+        <input type="datetime-local" id="inbound-start" /> <span>至</span> <input type="datetime-local" id="inbound-end" />
+        <label>状态</label>
+        <select id="inbound-status"><option value="">全部</option><option value="success">成功</option><option value="fail">失败</option></select>
+        <button class="btn btn-primary" id="btn-query-inbound">查询</button>
+        <button class="btn btn-ghost" id="btn-reset-inbound">重置</button>
+      </div>
+      <div class="stats-row">
+        <div class="stat-card"><div class="stat-label">总调用次数</div><div class="stat-value primary" id="inbound-total">0 <span class="stat-unit">次</span></div></div>
+        <div class="stat-card"><div class="stat-label">成功</div><div class="stat-value success" id="inbound-success">0 <span class="stat-unit">次</span></div></div>
+        <div class="stat-card"><div class="stat-label">失败</div><div class="stat-value error" id="inbound-fail">0 <span class="stat-unit">次</span></div></div>
+        <div class="stat-card"><div class="stat-label">平均响应</div><div class="stat-value" id="inbound-avg">—</div></div>
+      </div>
+      <div class="table-card">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>序号</th>
+                <th>接口名称</th>
+                <th>来源系统</th>
+                <th>批次号</th>
+                <th>响应状态</th>
+                <th>下发行数</th>
+                <th>响应时间</th>
+                <th>错误信息</th>
+                <th>创建时间</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="inbound-tbody"></tbody>
+          </table>
+        </div>
+        <div class="pagination">
+          <span class="pagination-info" id="inbound-page-info">共 0 条</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 中间表 -->
+    <div id="view-storage" class="drill-view">
+      <div class="page-header">
+        <h1 class="page-title">中间表</h1>
+        <p class="page-desc">从外部系统获取数据时回传的原始数据凭证，全量接收无拒收</p>
+      </div>
+      <div class="toolbar">
+        <label>接口分类</label>
+        <input type="text" id="storage-category" placeholder="支持模糊搜索，如：物料、客户、订单" style="min-width: 180px;" list="storage-category-list" />
+        <datalist id="storage-category-list"><option value="物料"><option value="客户"><option value="订单"></datalist>
+        <label>接口日志ID</label>
+        <input type="text" id="storage-apiLogId" placeholder="选择分类后展示，支持模糊搜索" style="min-width: 200px;" list="storage-logId-list" />
+        <datalist id="storage-logId-list"></datalist>
+        <button class="btn btn-primary" id="btn-query-storage">查询</button>
+        <button class="btn btn-ghost" id="btn-reset-storage">重置</button>
+      </div>
+      <div class="table-card">
+        <div class="table-wrap" style="max-height: 560px;">
+          <table>
+            <thead>
+              <tr>
+                <th>序号</th>
+                <th>数据ID</th>
+                <th>数据内容</th>
+                <th>入库时间</th>
+              </tr>
+            </thead>
+            <tbody id="storage-tbody"></tbody>
+          </table>
+        </div>
+        <div class="pagination">
+          <span class="pagination-info" id="storage-page-info">请选择接口分类和接口日志ID后查询</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 场景库分发 -->
+    <div id="view-distribution" class="drill-view">
+      <div class="page-header">
+        <h1 class="page-title">场景库分发</h1>
+        <p class="page-desc">中间表数据分发至各场景库的统计与失败明细</p>
+      </div>
+      <div class="toolbar">
+        <label>接口分类</label>
+        <select id="dist-category"><option value="">全部</option><option value="物料">物料</option><option value="客户">客户</option></select>
+        <label>场景</label>
+        <select id="dist-scenario"><option value="">全部</option><option value="SCH">SCH</option><option value="MPS">MPS</option><option value="S&OP">S&OP</option></select>
+        <label>接口日志ID</label>
+        <input type="text" id="dist-apiLogId" placeholder="关联 apiLogId" style="min-width: 180px;" />
+        <label>是否有失败</label>
+        <select id="dist-hasFail"><option value="">全部</option><option value="1">有失败</option><option value="0">无失败</option></select>
+        <button class="btn btn-primary" id="btn-query-dist">查询</button>
+        <button class="btn btn-ghost" id="btn-reset-dist">重置</button>
+      </div>
+      <div class="stats-row">
+        <div class="stat-card"><div class="stat-label">总分发条数</div><div class="stat-value primary" id="dist-total">0 <span class="stat-unit">行</span></div></div>
+        <div class="stat-card"><div class="stat-label">成功</div><div class="stat-value success" id="dist-success">0 <span class="stat-unit">行</span></div></div>
+        <div class="stat-card"><div class="stat-label">失败/拒绝</div><div class="stat-value error" id="dist-fail">0 <span class="stat-unit">行</span></div></div>
+        <div class="stat-card-export" id="btn-export-distribution">
+          <span class="export-text">导出当前筛选条件下所有失败数据</span>
+        </div>
+      </div>
+      <div class="table-card">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>序号</th>
+                <th>接口日志ID</th>
+                <th>接口分类</th>
+                <th>场景</th>
+                <th>总数量</th>
+                <th>成功</th>
+                <th>失败</th>
+                <th>失败原因摘要</th>
+                <th>分发时间</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="dist-tbody"></tbody>
+          </table>
+        </div>
+        <div class="pagination">
+          <span class="pagination-info" id="dist-page-info">共 0 条</span>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- 详情抽屉：出站/入站日志 -->
+<div id="drawer-log" class="modal-overlay" onclick="if(event.target===this)closeDrawer()">
+  <div class="drawer" onclick="event.stopPropagation()">
+    <div class="drawer-header">
+      <h2 class="drawer-title">调用日志详情</h2>
+      <button class="drawer-close" onclick="closeDrawer()">×</button>
+    </div>
+    <div class="drawer-body">
+      <div class="detail-row"><span class="detail-label">接口名称</span><span class="detail-value" id="d-apiName">—</span></div>
+      <div class="detail-row"><span class="detail-label">批次号</span><span class="detail-value" id="d-batchNo">—</span></div>
+      <div class="detail-row"><span class="detail-label">请求方式</span><span class="detail-value" id="d-requestType">—</span></div>
+      <div class="detail-row"><span class="detail-label">响应状态</span><span class="detail-value" id="d-responseStatus">—</span></div>
+      <div class="detail-row" id="d-resolveApply-row"><span class="detail-label">解析/应用</span><span class="detail-value" id="d-resolveApply">—</span></div>
+      <div class="detail-row"><span class="detail-label">响应时间</span><span class="detail-value" id="d-responseTime">—</span></div>
+      <div class="detail-row"><span class="detail-label">错误信息</span><span class="detail-value" id="d-errorMsg">—</span></div>
+      <div class="detail-row" id="d-retry-row" style="display:none;"><span class="detail-label">重试</span><span class="detail-value"><button type="button" class="btn-link-sm" id="btn-drawer-manual-retry">手动重试</button></span></div>
+      <div class="detail-block">
+        <div class="detail-block-title">请求头</div>
+        <div class="code-block-wrap"><button type="button" class="copy-btn" title="复制" onclick="copyCodeBlock('d-requestHeaders')"></button><div class="code-block" id="d-requestHeaders">Content-Type: application/json</div></div>
+      </div>
+      <div class="detail-block">
+        <div class="detail-block-title">请求体</div>
+        <div class="code-block-wrap"><button type="button" class="copy-btn" title="复制" onclick="copyCodeBlock('d-requestBody')"></button><div class="code-block" id="d-requestBody">{ "pageSize": 100 }</div></div>
+      </div>
+      <div class="detail-block">
+        <div class="detail-block-title">响应体</div>
+        <div class="code-block-wrap"><button type="button" class="copy-btn" title="复制" onclick="copyCodeBlock('d-responseBody')"></button><div class="code-block" id="d-responseBody">{ "code": 200, "data": [...] }</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 详情抽屉：中间表入库 -->
+<div id="drawer-storage" class="modal-overlay" onclick="if(event.target===this)closeDrawer()">
+  <div class="drawer" onclick="event.stopPropagation()">
+    <div class="drawer-header">
+      <h2 class="drawer-title">入库处理明细</h2>
+      <button class="drawer-close" onclick="closeDrawer()">×</button>
+    </div>
+    <div class="drawer-body">
+      <div class="detail-row"><span class="detail-label">接口日志ID</span><span class="detail-value" id="d-storage-logId">—</span></div>
+      <div class="detail-row"><span class="detail-label">中间表</span><span class="detail-value" id="d-storage-table">—</span></div>
+      <div class="detail-row"><span class="detail-label">总数量</span><span class="detail-value" id="d-storage-total">—</span></div>
+      <div class="detail-row"><span class="detail-label">成功</span><span class="detail-value" id="d-storage-success" style="color:var(--success)">—</span></div>
+      <div class="detail-row"><span class="detail-label">失败</span><span class="detail-value" id="d-storage-fail" style="color:var(--error)">—</span></div>
+      <div class="detail-block">
+        <div class="detail-block-title">失败/拒绝录入的数据明细</div>
+        <div class="error-summary-bar">
+          <span id="d-storage-error-info">共 0 条失败</span>
+          <button class="btn btn-ghost export-btn" id="btn-export-storage-drawer">导出 Excel</button>
+        </div>
+        <div class="error-list error-list-wrap" id="d-storage-error-list"></div>
+        <div class="pagination" id="d-storage-error-pagination" style="margin-top: 12px; display: none;">
+          <span class="pagination-info" id="d-storage-error-page-info">第 1 页</span>
+          <div class="pagination-btns" id="d-storage-error-page-btns"></div>
+        </div>
+        <p class="error-scale-hint" style="font-size: 11px; color: var(--text-muted); margin-top: 10px; padding: 8px 12px; background: var(--header-bg); border-radius: var(--radius-sm);">大量数据时：失败条数 &gt;100 仅展示前 50 条并分页；&gt;1000 建议导出 Excel 后离线分析</p>
+      </div>
+      <div class="detail-block">
+        <div class="detail-block-title">成功数据（可下钻到场景接口数据）</div>
+        <p style="font-size: 13px; color: var(--text-muted);" id="d-storage-success-note">—</p>
+        <button class="btn btn-ghost" style="margin-top: 12px;">跳转场景接口数据</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 详情抽屉：场景库分发 -->
+<div id="drawer-distribution" class="modal-overlay" onclick="if(event.target===this)closeDrawer()">
+  <div class="drawer" onclick="event.stopPropagation()">
+    <div class="drawer-header">
+      <h2 class="drawer-title">分发处理明细</h2>
+      <button class="drawer-close" onclick="closeDrawer()">×</button>
+    </div>
+    <div class="drawer-body">
+      <div class="detail-row"><span class="detail-label">接口日志ID</span><span class="detail-value" id="d-dist-logId">—</span></div>
+      <div class="detail-row"><span class="detail-label">场景</span><span class="detail-value" id="d-dist-scenario">—</span></div>
+      <div class="detail-row"><span class="detail-label">总数量</span><span class="detail-value" id="d-dist-total">—</span></div>
+      <div class="detail-row"><span class="detail-label">成功</span><span class="detail-value" id="d-dist-success" style="color:var(--success)">—</span></div>
+      <div class="detail-row"><span class="detail-label">失败</span><span class="detail-value" id="d-dist-fail" style="color:var(--error)">—</span></div>
+      <div class="detail-block">
+        <div class="detail-block-title">失败/拒绝录入的数据明细</div>
+        <div class="error-summary-bar" id="d-dist-error-summary-bar">
+          <span id="d-dist-error-info">共 0 条失败</span>
+          <button class="btn btn-ghost export-btn" id="btn-export-dist-drawer" style="display:none;">导出 Excel</button>
+        </div>
+        <div class="error-list error-list-wrap" id="d-dist-error-list"></div>
+        <div class="pagination" id="d-dist-error-pagination" style="margin-top: 12px; display: none;">
+          <span class="pagination-info" id="d-dist-error-page-info">第 1 页</span>
+          <div class="pagination-btns" id="d-dist-error-page-btns"></div>
+        </div>
+        <p class="error-scale-hint" style="font-size: 11px; color: var(--text-muted); margin-top: 10px; padding: 8px 12px; background: var(--header-bg); border-radius: var(--radius-sm);">大量数据时：失败条数 &gt;100 仅展示前 50 条并分页；&gt;1000 建议导出 Excel 后离线分析</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const ERRORS_PAGE_SIZE = 50;
+
+  // 模拟数据：从外部获取（向外部发起请求并接收数据），支持自动重试与手动重试
+  const outboundLogs = [
+    { id: 'log-001', apiName: 'ERP-物料主数据同步', batchNo: 'B20250302001', requestType: 'POST', status: 'success', resolve: 120, apply: 118, responseTime: '2.3s', errorMsg: '—', createTime: '2025-03-02 14:32:15', autoRetryCount: 0 },
+    { id: 'log-001b', apiName: 'ERP-物料主数据同步', batchNo: 'B20250302004', requestType: 'POST', status: 'success', resolve: 80, apply: 80, responseTime: '1.8s', errorMsg: '—', createTime: '2025-03-02 10:15:22', autoRetryCount: 0 },
+    { id: 'log-003', apiName: 'ERP-客户信息同步', batchNo: 'B20250302003', requestType: 'POST', status: 'fail', resolve: 0, apply: 0, responseTime: '—', errorMsg: '连接超时', createTime: '2025-03-02 14:15:22', autoRetryCount: 3 },
+    { id: 'log-003b', apiName: 'ERP-客户信息同步', batchNo: 'B20250302005', requestType: 'POST', status: 'success', resolve: 50, apply: 50, responseTime: '2.1s', errorMsg: '—', createTime: '2025-03-02 09:30:00', autoRetryCount: 0 }
+  ];
+
+  // 模拟数据：向外部提供（外部向本系统请求，本系统返回数据），下发行数=本系统下发的行数
+  const inboundLogs = [
+    { id: 'log-002', apiName: 'MES-生产订单回传', source: 'MES', batchNo: 'B20250302002', status: 'success', deliverRows: 45, responseTime: '1.1s', errorMsg: '—', createTime: '2025-03-02 14:28:03' },
+    { id: 'log-002b', apiName: 'MES-生产订单回传', source: 'MES', batchNo: 'B20250302006', status: 'success', deliverRows: 30, responseTime: '0.9s', errorMsg: '—', createTime: '2025-03-02 11:20:15' },
+    { id: 'log-006', apiName: 'WMS-库存回传', source: 'WMS', batchNo: 'B20250302007', status: 'success', deliverRows: 120, responseTime: '1.5s', errorMsg: '—', createTime: '2025-03-02 16:00:00' },
+    { id: 'log-006b', apiName: 'WMS-库存回传', source: 'WMS', batchNo: 'B20250302008', status: 'fail', deliverRows: 0, responseTime: '—', errorMsg: '参数校验失败', createTime: '2025-03-02 08:00:00' }
+  ];
+
+  // 生成100条错误明细
+  function genErrors(prefix, count, types) {
+    const errs = [];
+    for (let i = 1; i <= count; i++) {
+      const t = types[(i - 1) % types.length];
+      errs.push({ dataId: `${prefix}-${String(i).padStart(3,'0')}`, type: t.type, detail: t.detail });
+    }
+    return errs;
+  }
+
+  const storageErrors100 = genErrors('ITF-PROD', 100, [
+    { type: '主键重复', detail: "Duplicate entry for key 'PRIMARY'" },
+    { type: '字段校验失败', detail: '物料编码不能为空' },
+    { type: '外键约束', detail: '库存点 ID 不存在' }
+  ]);
+
+  const distErrors100 = genErrors('ITF-PROD', 100, [
+    { type: '外键约束', detail: '库存点 ID 不存在于 mds_stock_point' },
+    { type: '唯一约束', detail: 'Duplicate entry for product_code in sch_product' }
+  ]);
+
+  // 中间表：从外部获取数据时回传的原始数据，按 logId 存储，全量接收无拒收
+  const categoryByApi = { 'ERP-物料主数据同步': '物料', 'ERP-客户信息同步': '客户', 'MES-生产订单回传': '订单', 'WMS-库存回传': '订单' };
+  const storageTableRows = {
+    'log-001': Array.from({ length: 120 }, (_, i) => ({ dataId: `ITF-PROD-${String(i+1).padStart(3,'0')}`, dataContent: JSON.stringify({ material_code: `MAT-${String(i+1).padStart(3,'0')}`, name: `物料${i+1}` }), createTime: '2025-03-02 14:32:18' })),
+    'log-001b': Array.from({ length: 80 }, (_, i) => ({ dataId: `ITF-PROD-${String(i+1).padStart(3,'0')}`, dataContent: JSON.stringify({ material_code: `MAT-${String(i+1).padStart(3,'0')}`, name: `物料${i+1}` }), createTime: '2025-03-02 10:16:00' })),
+    'log-003': [],
+    'log-003b': Array.from({ length: 50 }, (_, i) => ({ dataId: `ITF-CUST-${String(i+1).padStart(3,'0')}`, dataContent: JSON.stringify({ customer_code: `CUST-${i+1}`, name: `客户${i+1}` }), createTime: '2025-03-02 09:30:00' }))
+  };
+  const allCategories = ['物料', '客户', '订单'];
+  function getLogIdsByCategory(cat) {
+    if (!cat || !String(cat).trim()) return [];
+    const kw = String(cat).trim().toLowerCase();
+    return outboundLogs.filter(l => (categoryByApi[l.apiName] || '').toLowerCase().includes(kw)).map(l => l.id);
+  }
+
+  // 模拟数据：场景库分发
+  const distRecords = [
+    { id: 'dist-001', logId: 'log-001', category: '物料', scenario: 'SCH', total: 118, success: 115, fail: 3, failSummary: '外键约束 2 条；唯一约束 1 条', createTime: '2025-03-02 14:32:25', errors: [
+      { dataId: 'ITF-PROD-015', type: '外键约束', detail: '库存点 ID 不存在于 mds_stock_point' },
+      { dataId: 'ITF-PROD-067', type: '外键约束', detail: '库存点 ID 不存在于 mds_stock_point' },
+      { dataId: 'ITF-PROD-099', type: '唯一约束', detail: 'Duplicate entry for product_code in sch_product' }
+    ]},
+    { id: 'dist-002', logId: 'log-002', category: '订单', scenario: 'MPS', total: 45, success: 45, fail: 0, failSummary: '—', createTime: '2025-03-02 14:28:10', errors: [] },
+    { id: 'dist-003', logId: 'log-001b', category: '物料', scenario: 'SCH', total: 100, success: 0, fail: 100, failSummary: '外键约束 50 条；唯一约束 50 条', createTime: '2025-03-02 10:17:00', errors: distErrors100 }
+  ];
+
+  const logMock = {};
+  outboundLogs.forEach(l => { logMock[l.id] = { apiName: l.apiName, batchNo: l.batchNo, requestType: l.requestType, responseStatus: l.status === 'success' ? '成功' : '失败', resolveApply: `${l.resolve} / ${l.apply}`, responseTime: l.responseTime, errorMsg: l.errorMsg, requestHeaders: 'Content-Type: application/json\nAuthorization: Bearer xxx', requestBody: '{ "pageSize": 100, "batchNo": "' + l.batchNo + '" }', responseBody: l.status === 'success' ? '{ "code": 200, "data": { "total": ' + l.resolve + ', "items": [...] } }' : '{ "code": 500, "message": "' + (l.errorMsg || '') + '" }' }; });
+  inboundLogs.forEach(l => { logMock[l.id] = { apiName: l.apiName, batchNo: l.batchNo, requestType: l.requestType, responseStatus: l.status === 'success' ? '成功' : '失败', deliverRows: l.deliverRows, responseTime: l.responseTime, errorMsg: l.errorMsg, requestHeaders: 'Content-Type: application/json', requestBody: '{ "requestId": "req-' + l.batchNo + '" }', responseBody: l.status === 'success' ? '{ "code": 200, "rows": ' + l.deliverRows + ' }' : '{ "code": 400, "message": "' + (l.errorMsg || '') + '" }' }; });
+
+  function parseDate(s) { return new Date(s.replace(' ', 'T')); }
+  function inRange(t, start, end) {
+    if (!start || !end) return true;
+    const d = parseDate(t);
+    return d >= new Date(start) && d <= new Date(end);
+  }
+
+  function filterOutbound() {
+    const api = document.getElementById('outbound-api').value;
+    const start = document.getElementById('outbound-start').value;
+    const end = document.getElementById('outbound-end').value;
+    const status = document.getElementById('outbound-status').value;
+    let list = outboundLogs.filter(l => {
+      if (api && !l.apiName.includes(api)) return false;
+      if (!inRange(l.createTime, start, end)) return false;
+      if (status && (status === 'success' ? l.status !== 'success' : l.status !== 'fail')) return false;
+      return true;
+    });
+    const total = list.length;
+    const success = list.filter(l => l.status === 'success').length;
+    const fail = total - success;
+    const validForAvg = list.filter(l => l.responseTime && l.responseTime !== '—');
+    const avg = validForAvg.length ? (validForAvg.reduce((a,l) => a + parseFloat(String(l.responseTime).replace('s','')), 0) / validForAvg.length).toFixed(1) + 's' : '—';
+    document.getElementById('outbound-total').innerHTML = total + ' <span class="stat-unit">次</span>';
+    document.getElementById('outbound-success').innerHTML = success + ' <span class="stat-unit">次</span>';
+    document.getElementById('outbound-fail').innerHTML = fail + ' <span class="stat-unit">次</span>';
+    document.getElementById('outbound-avg').textContent = avg;
+    const tbody = document.getElementById('outbound-tbody');
+    tbody.innerHTML = list.map((l, i) => {
+      const errorHtml = l.status === 'fail' ? (l.errorMsg || '—') + (l.autoRetryCount ? '<br><span class="retry-info">自动重试' + l.autoRetryCount + '次</span>' : '') : (l.errorMsg || '—');
+      const retryHtml = l.status === 'fail' ? `<button type="button" class="btn-link-sm" onclick="event.stopPropagation();manualRetry('${l.id}')">手动重试</button>` : '—';
+      return `<tr class="clickable" data-log-id="${l.id}">
+      <td>${i+1}</td><td>${l.apiName}</td><td>${l.batchNo}</td><td>${l.requestType}</td>
+      <td><span class="status-dot ${l.status}"></span> ${l.status === 'success' ? '成功' : '失败'}</td>
+      <td>${l.resolve} / ${l.apply}</td><td>${l.responseTime}</td><td>${errorHtml}</td>
+      <td>${retryHtml}</td><td>${l.createTime}</td>
+      <td><button type="button" class="btn-link-sm" onclick="event.stopPropagation();openDetail('outbound','${l.id}')">详情</button></td>
+    </tr>`;
+    }).join('');
+    document.getElementById('outbound-page-info').textContent = '共 ' + total + ' 条';
+  }
+
+  function filterInbound() {
+    const api = document.getElementById('inbound-api').value;
+    const start = document.getElementById('inbound-start').value;
+    const end = document.getElementById('inbound-end').value;
+    const status = document.getElementById('inbound-status').value;
+    let list = inboundLogs.filter(l => {
+      if (api && !l.apiName.includes(api)) return false;
+      if (!inRange(l.createTime, start, end)) return false;
+      if (status && (status === 'success' ? l.status !== 'success' : l.status !== 'fail')) return false;
+      return true;
+    });
+    const total = list.length;
+    const success = list.filter(l => l.status === 'success').length;
+    const fail = total - success;
+    const validForAvg = list.filter(l => l.responseTime && l.responseTime !== '—');
+    const avg = validForAvg.length ? (validForAvg.reduce((a,l) => a + parseFloat(String(l.responseTime).replace('s','')), 0) / validForAvg.length).toFixed(1) + 's' : '—';
+    document.getElementById('inbound-total').innerHTML = total + ' <span class="stat-unit">次</span>';
+    document.getElementById('inbound-success').innerHTML = success + ' <span class="stat-unit">次</span>';
+    document.getElementById('inbound-fail').innerHTML = fail + ' <span class="stat-unit">次</span>';
+    document.getElementById('inbound-avg').textContent = avg;
+    const tbody = document.getElementById('inbound-tbody');
+    tbody.innerHTML = list.map((l, i) => `<tr class="clickable" data-log-id="${l.id}">
+      <td>${i+1}</td><td>${l.apiName}</td><td>${l.source}</td><td>${l.batchNo}</td>
+      <td><span class="status-dot ${l.status}"></span> ${l.status === 'success' ? '成功' : '失败'}</td>
+      <td>${l.deliverRows}</td><td>${l.responseTime}</td><td>${l.errorMsg}</td><td>${l.createTime}</td>
+      <td><button type="button" class="btn-link-sm" onclick="event.stopPropagation();openDetail('inbound','${l.id}')">详情</button></td>
+    </tr>`).join('');
+    document.getElementById('inbound-page-info').textContent = '共 ' + total + ' 条';
+  }
+
+  function filterStorage() {
+    const catInput = (document.getElementById('storage-category').value || '').trim();
+    const logIdInput = (document.getElementById('storage-apiLogId').value || '').trim();
+    const catKw = catInput.toLowerCase();
+    const logKw = logIdInput.toLowerCase();
+    const matchedCat = catKw ? allCategories.find(c => c.toLowerCase().includes(catKw)) : null;
+    const logIds = getLogIdsByCategory(matchedCat || catInput || null);
+    const availableLogIds = logIds.filter(id => !logKw || id.toLowerCase().includes(logKw));
+    const selectedLogId = logIdInput ? (availableLogIds.find(id => id.toLowerCase() === logKw) || availableLogIds[0]) : null;
+    const rows = selectedLogId && storageTableRows[selectedLogId] ? storageTableRows[selectedLogId] : [];
+    const tbody = document.getElementById('storage-tbody');
+    tbody.innerHTML = rows.map((r, i) => `<tr>
+      <td>${i+1}</td><td>${r.dataId}</td><td><div class="code-block" style="max-height:80px;">${escapeHtml(r.dataContent)}</div></td><td>${r.createTime}</td>
+    </tr>`).join('');
+    document.getElementById('storage-page-info').textContent = rows.length ? '共 ' + rows.length + ' 条' : (selectedLogId ? '该日志下无中间表数据' : '请选择接口分类和接口日志ID后查询');
+    const dl = document.getElementById('storage-logId-list');
+    dl.innerHTML = logIds.map(id => `<option value="${id}">`).join('');
+  }
+  function escapeHtml(s) { const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+  function manualRetry(logId) { alert('手动重试：' + logId + '\n（原型演示，实际将调用重试接口）'); }
+
+  function filterDist() {
+    const cat = document.getElementById('dist-category').value;
+    const scenario = document.getElementById('dist-scenario').value;
+    const logId = (document.getElementById('dist-apiLogId').value || '').trim().toLowerCase();
+    const hasFail = document.getElementById('dist-hasFail').value;
+    let list = distRecords.filter(r => {
+      if (cat && r.category !== cat) return false;
+      if (scenario && r.scenario !== scenario) return false;
+      if (logId && !r.logId.toLowerCase().includes(logId)) return false;
+      if (hasFail === '1' && r.fail === 0) return false;
+      if (hasFail === '0' && r.fail > 0) return false;
+      return true;
+    });
+    const total = list.reduce((a,r) => a + r.total, 0);
+    const success = list.reduce((a,r) => a + r.success, 0);
+    const fail = list.reduce((a,r) => a + r.fail, 0);
+    document.getElementById('dist-total').innerHTML = total + ' <span class="stat-unit">行</span>';
+    document.getElementById('dist-success').innerHTML = success + ' <span class="stat-unit">行</span>';
+    document.getElementById('dist-fail').innerHTML = fail + ' <span class="stat-unit">行</span>';
+    const tbody = document.getElementById('dist-tbody');
+    tbody.innerHTML = list.map((r, i) => `<tr class="clickable" data-dist-id="${r.id}">
+      <td>${i+1}</td><td>${r.logId}</td><td>${r.category}</td><td>${r.scenario}</td><td>${r.total}</td>
+      <td><span class="stat-value success">${r.success}</span></td><td><span class="stat-value ${r.fail?'error':'success'}">${r.fail}</span></td>
+      <td>${r.failSummary}</td><td>${r.createTime}</td>
+      <td><button type="button" class="btn-link-sm" onclick="event.stopPropagation();openDistDetail('${r.id}')">明细</button></td>
+    </tr>`).join('');
+    document.getElementById('dist-page-info').textContent = '共 ' + list.length + ' 条';
+  }
+
+  function updateOverview() {
+    const oTotal = outboundLogs.length, oSuc = outboundLogs.filter(l=>l.status==='success').length, oFail = oTotal - oSuc;
+    const iTotal = inboundLogs.length, iSuc = inboundLogs.filter(l=>l.status==='success').length, iFail = iTotal - iSuc;
+    const sTotal = Object.values(storageTableRows).reduce((a,rows)=>a+rows.length,0);
+    const dTotal = distRecords.reduce((a,r)=>a+r.total,0), dSuc = distRecords.reduce((a,r)=>a+r.success,0), dFail = distRecords.reduce((a,r)=>a+r.fail,0);
+    document.getElementById('overview-outbound').innerHTML = oTotal + ' <span class="stat-unit">次</span>';
+    document.getElementById('overview-outbound-sub').textContent = '成功 ' + oSuc + ' 次 · 失败 ' + oFail + ' 次';
+    document.getElementById('overview-inbound').innerHTML = iTotal + ' <span class="stat-unit">次</span>';
+    document.getElementById('overview-inbound-sub').textContent = '成功 ' + iSuc + ' 次 · 失败 ' + iFail + ' 次';
+    document.getElementById('overview-storage').innerHTML = sTotal + ' <span class="stat-unit">行</span>';
+    document.getElementById('overview-storage-sub').textContent = '今日接收凭证';
+    document.getElementById('overview-dist').innerHTML = dTotal + ' <span class="stat-unit">行</span>';
+    document.getElementById('overview-dist-sub').textContent = '成功 ' + dSuc + ' 行 · 失败 ' + dFail + ' 行';
+    const storageRecent = Object.entries(storageTableRows).filter(([,rows])=>rows.length).slice(0,2).map(([logId,rows])=>({ logId, rows: rows.length, createTime: rows[0]?.createTime, type:'storage', label:'中间表', apiName: logId + ' ' + rows.length + ' 行' }));
+    const recent = [
+      ...outboundLogs.slice(0,2).map(l=>({...l, type:'outbound', label:'获取'})),
+      ...inboundLogs.slice(0,2).map(l=>({...l, type:'inbound', label:'提供'})),
+      ...storageRecent,
+      ...distRecords.slice(0,2).map(r=>({...r, type:'distribution', label:'分发', apiName: r.scenario + '场景库-' + r.category}))
+    ].sort((a,b)=>(parseDate(b.createTime||'')||0)-(parseDate(a.createTime||'')||0)).slice(0, 8);
+    const tbody = document.getElementById('overview-tbody');
+    tbody.innerHTML = recent.map(r => {
+      let status, parseApply, attrs = `data-type="${r.type}"`;
+      if (r.type === 'outbound' || r.type === 'inbound') {
+        attrs += ` data-log-id="${r.id}"`;
+        status = r.status === 'success' ? '成功' : '失败';
+        parseApply = r.type === 'inbound' ? (r.deliverRows || 0) : (r.resolve + ' / ' + r.apply);
+      } else if (r.type === 'storage') {
+        attrs += ` data-nav="storage"`;
+        status = r.rows + ' 行';
+        parseApply = '—';
+      } else {
+        attrs += ` data-dist-id="${r.id}"`;
+        status = r.success + '/' + r.total;
+        parseApply = r.fail ? r.fail + ' 条失败' : '—';
+      }
+      return `<tr class="clickable" ${attrs}>
+        <td><span class="status-dot ${r.fail>0?'warn':r.status||'success'}"></span> ${r.label}</td>
+        <td>${r.apiName}</td><td>${r.batchNo || '—'}</td><td>${status}</td><td>${parseApply}</td><td>${r.createTime || (r.rows && r.createTime) || '—'}</td>
+      </tr>`;
+    }).join('');
+    document.getElementById('overview-page-info').textContent = '共 ' + recent.length + ' 条';
+  }
+
+  function showView(viewId) {
+    document.querySelectorAll('.drill-view').forEach(v => v.classList.remove('active'));
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    const view = document.getElementById('view-' + viewId);
+    const tab = document.querySelector('.tab[data-view="' + viewId + '"]');
+    if (view) view.classList.add('active');
+    if (tab) tab.classList.add('active');
+  }
+
+  document.querySelectorAll('.tab').forEach(t => { t.addEventListener('click', () => showView(t.dataset.view)); });
+  document.querySelectorAll('.stat-card.clickable[data-nav]').forEach(c => { c.addEventListener('click', () => showView(c.dataset.nav)); });
+
+  function openDetail(type, logId) {
+    const d = logMock[logId];
+    const row = document.getElementById('d-resolveApply-row');
+    const retryRow = document.getElementById('d-retry-row');
+    if (d) {
+      document.getElementById('d-apiName').textContent = d.apiName;
+      document.getElementById('d-batchNo').textContent = d.batchNo;
+      document.getElementById('d-requestType').textContent = d.requestType;
+      document.getElementById('d-responseStatus').textContent = d.responseStatus;
+      if (type === 'inbound') {
+        row.querySelector('.detail-label').textContent = '下发行数';
+        document.getElementById('d-resolveApply').textContent = (d.deliverRows != null ? d.deliverRows : '—') + ' 行';
+      } else {
+        row.querySelector('.detail-label').textContent = '解析/应用';
+        document.getElementById('d-resolveApply').textContent = d.resolveApply || '—';
+      }
+      document.getElementById('d-responseTime').textContent = d.responseTime || '—';
+      const log = type === 'outbound' ? outboundLogs.find(l => l.id === logId) : null;
+      const errorHtml = (d.errorMsg || '—') + (log && log.status === 'fail' && log.autoRetryCount ? '<br><span class="retry-info">自动重试' + log.autoRetryCount + '次</span>' : '');
+      document.getElementById('d-errorMsg').innerHTML = errorHtml;
+      document.getElementById('d-requestHeaders').textContent = d.requestHeaders || '—';
+      document.getElementById('d-requestBody').textContent = d.requestBody || '—';
+      document.getElementById('d-responseBody').textContent = d.responseBody || '—';
+      if (type === 'outbound') {
+        retryRow.style.display = log && log.status === 'fail' ? 'flex' : 'none';
+        const btn = document.getElementById('btn-drawer-manual-retry');
+        btn.onclick = () => { manualRetry(logId); };
+      } else retryRow.style.display = 'none';
+    }
+    document.getElementById('drawer-log').classList.add('visible');
+  }
+  function copyCodeBlock(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    navigator.clipboard.writeText(el.textContent).then(() => alert('已复制到剪贴板')).catch(() => alert('复制失败'));
+  }
+
+  let currentStorageRecord = null;
+  let storageDetailPage = 1;
+  const storageRecords = []; // 中间表已改为仅展示数据，不再使用入库明细抽屉
+  function openStorageDetail(id) {
+    const r = storageRecords.find(x => x.id === id);
+    if (!r) return;
+    currentStorageRecord = r;
+    document.getElementById('d-storage-logId').textContent = r.logId;
+    document.getElementById('d-storage-table').textContent = r.table;
+    document.getElementById('d-storage-total').textContent = r.total + ' 行';
+    document.getElementById('d-storage-success').textContent = r.success + ' 行';
+    document.getElementById('d-storage-fail').textContent = r.fail + ' 行';
+    document.getElementById('d-storage-success-note').textContent = '共 ' + r.success + ' 条已成功写入 ' + r.table + '，可前往「场景接口数据」按 apiLogId=' + r.logId + ' 查看明细。';
+    storageDetailPage = 1;
+    renderStorageErrors(r.errors, 1);
+    document.getElementById('drawer-storage').classList.add('visible');
+  }
+
+  function renderStorageErrors(errors, page) {
+    if (!currentStorageRecord) return;
+    const errs = currentStorageRecord.errors || [];
+    const total = errs.length;
+    const totalPages = Math.ceil(total / ERRORS_PAGE_SIZE) || 1;
+    const start = (page - 1) * ERRORS_PAGE_SIZE;
+    const slice = errs.slice(start, start + ERRORS_PAGE_SIZE);
+    document.getElementById('d-storage-error-info').textContent = total > ERRORS_PAGE_SIZE
+      ? '共 ' + total + ' 条失败，当前展示第 ' + (start + 1) + '-' + (start + slice.length) + ' 条'
+      : '共 ' + total + ' 条失败，当前展示全部';
+    document.getElementById('d-storage-error-list').innerHTML = slice.map(e =>
+      `<div class="error-item"><div class="err-row"><span class="err-key">数据ID</span><span>${e.dataId}</span></div>
+       <div class="err-row"><span class="err-key">错误类型</span><span class="err-msg">${e.type}</span></div>
+       <div class="err-row"><span class="err-key">错误详情</span><span>${e.detail}</span></div></div>`
+    ).join('');
+    const pagEl = document.getElementById('d-storage-error-pagination');
+    if (total > ERRORS_PAGE_SIZE) {
+      pagEl.style.display = 'flex';
+      document.getElementById('d-storage-error-page-info').textContent = '第 ' + page + ' 页，共 ' + totalPages + ' 页';
+      const btns = document.getElementById('d-storage-error-page-btns');
+      btns.innerHTML = `<button ${page<=1?'disabled':''} onclick="storageDetailPage--;renderStorageErrors(currentStorageRecord.errors,storageDetailPage)">上一页</button>
+        ${Array.from({length:totalPages},(_,i)=>`<button class="${i+1===page?'active':''}" onclick="storageDetailPage=${i+1};renderStorageErrors(currentStorageRecord.errors,${i+1})">${i+1}</button>`).join('')}
+        <button ${page>=totalPages?'disabled':''} onclick="storageDetailPage++;renderStorageErrors(currentStorageRecord.errors,storageDetailPage)">下一页</button>`;
+    } else pagEl.style.display = 'none';
+  }
+
+  let currentDistRecord = null;
+  let distDetailPage = 1;
+  function openDistDetail(id) {
+    const r = distRecords.find(x => x.id === id);
+    if (!r) return;
+    currentDistRecord = r;
+    document.getElementById('d-dist-logId').textContent = r.logId;
+    document.getElementById('d-dist-scenario').textContent = r.scenario;
+    document.getElementById('d-dist-total').textContent = r.total + ' 行';
+    document.getElementById('d-dist-success').textContent = r.success + ' 行';
+    document.getElementById('d-dist-fail').textContent = r.fail + ' 行';
+    distDetailPage = 1;
+    const bar = document.getElementById('d-dist-error-summary-bar');
+    const infoEl = document.getElementById('d-dist-error-info');
+    const exportBtn = document.getElementById('btn-export-dist-drawer');
+    if (r.fail === 0) {
+      bar.classList.add('success');
+      infoEl.textContent = '全部成功';
+      exportBtn.style.display = 'none';
+    } else {
+      bar.classList.remove('success');
+      exportBtn.style.display = '';
+    }
+    renderDistErrors(r.errors, 1);
+    document.getElementById('drawer-distribution').classList.add('visible');
+  }
+
+  function renderDistErrors(errors, page) {
+    if (!currentDistRecord) return;
+    const errs = currentDistRecord.errors || [];
+    const total = errs.length;
+    const totalPages = Math.ceil(total / ERRORS_PAGE_SIZE) || 1;
+    const start = (page - 1) * ERRORS_PAGE_SIZE;
+    const slice = errs.slice(start, start + ERRORS_PAGE_SIZE);
+    document.getElementById('d-dist-error-info').textContent = total === 0
+      ? '全部成功'
+      : (total > ERRORS_PAGE_SIZE ? '共 ' + total + ' 条失败，当前展示第 ' + (start + 1) + '-' + (start + slice.length) + ' 条' : '共 ' + total + ' 条失败，当前展示全部');
+    document.getElementById('d-dist-error-list').innerHTML = slice.map(e =>
+      `<div class="error-item"><div class="err-row"><span class="err-key">数据ID</span><span>${e.dataId}</span></div>
+       <div class="err-row"><span class="err-key">错误类型</span><span class="err-msg">${e.type}</span></div>
+       <div class="err-row"><span class="err-key">错误详情</span><span>${e.detail}</span></div></div>`
+    ).join('');
+    const pagEl = document.getElementById('d-dist-error-pagination');
+    if (total > ERRORS_PAGE_SIZE) {
+      pagEl.style.display = 'flex';
+      document.getElementById('d-dist-error-page-info').textContent = '第 ' + page + ' 页，共 ' + totalPages + ' 页';
+      const btns = document.getElementById('d-dist-error-page-btns');
+      btns.innerHTML = `<button ${page<=1?'disabled':''} onclick="distDetailPage--;renderDistErrors(currentDistRecord.errors,distDetailPage)">上一页</button>
+        ${Array.from({length:totalPages},(_,i)=>`<button class="${i+1===page?'active':''}" onclick="distDetailPage=${i+1};renderDistErrors(currentDistRecord.errors,${i+1})">${i+1}</button>`).join('')}
+        <button ${page>=totalPages?'disabled':''} onclick="distDetailPage++;renderDistErrors(currentDistRecord.errors,distDetailPage)">下一页</button>`;
+    } else pagEl.style.display = 'none';
+  }
+
+  function closeDrawer() { document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('visible')); }
+
+  document.getElementById('btn-query-outbound').addEventListener('click', filterOutbound);
+  document.getElementById('btn-reset-outbound').addEventListener('click', () => {
+    document.getElementById('outbound-api').value = '';
+    document.getElementById('outbound-start').value = '2025-03-02T00:00:00';
+    document.getElementById('outbound-end').value = '2025-03-02T23:59:59';
+    document.getElementById('outbound-status').value = '';
+    filterOutbound();
+  });
+  document.getElementById('btn-query-inbound').addEventListener('click', filterInbound);
+  document.getElementById('btn-reset-inbound').addEventListener('click', () => {
+    document.getElementById('inbound-api').value = '';
+    document.getElementById('inbound-start').value = '';
+    document.getElementById('inbound-end').value = '';
+    document.getElementById('inbound-status').value = '';
+    filterInbound();
+  });
+  document.getElementById('btn-query-storage').addEventListener('click', filterStorage);
+  document.getElementById('storage-category').addEventListener('input', () => {
+    const catInput = (document.getElementById('storage-category').value || '').trim();
+    const matchedCat = catInput ? allCategories.find(c => c.toLowerCase().includes(catInput.toLowerCase())) : null;
+    const logIds = getLogIdsByCategory(matchedCat || catInput || null);
+    document.getElementById('storage-logId-list').innerHTML = logIds.map(id => `<option value="${id}">`).join('');
+  });
+  document.getElementById('btn-reset-storage').addEventListener('click', () => {
+    document.getElementById('storage-category').value = '';
+    document.getElementById('storage-apiLogId').value = '';
+    filterStorage();
+  });
+  document.getElementById('btn-query-dist').addEventListener('click', filterDist);
+  document.getElementById('btn-reset-dist').addEventListener('click', () => {
+    document.getElementById('dist-category').value = '';
+    document.getElementById('dist-scenario').value = '';
+    document.getElementById('dist-apiLogId').value = '';
+    document.getElementById('dist-hasFail').value = '';
+    filterDist();
+  });
+
+  document.getElementById('btn-export-distribution').addEventListener('click', () => alert('导出当前筛选条件下所有失败数据（原型演示）'));
+
+  document.addEventListener('click', function(e) {
+    const tr = e.target.closest('tr.clickable');
+    if (!tr) return;
+    const type = tr.dataset.type;
+    const logId = tr.dataset.logId;
+    const nav = tr.dataset.nav;
+    const distId = tr.dataset.distId;
+    if (type === 'outbound' && logId) openDetail('outbound', logId);
+    else if (type === 'inbound' && logId) openDetail('inbound', logId);
+    else if (type === 'storage' && nav === 'storage') showView('storage');
+    else if (type === 'distribution' && distId) openDistDetail(distId);
+  });
+
+  filterOutbound();
+  filterInbound();
+  filterStorage();
+  filterDist();
+  updateOverview();
+</script>
+</body>
+</html>

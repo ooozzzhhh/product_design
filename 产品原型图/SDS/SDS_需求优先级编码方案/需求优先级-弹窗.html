@@ -1,0 +1,1053 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>优先级因子配置</title>
+    <style>
+        /* --- 1. 基础重置 (Reset & Base) --- */
+        * { box-sizing: border-box; }
+        body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background-color: #f4f6f9; color: #333; line-height: 1.5; }
+        
+        /* --- 2. 布局容器 (Layout) --- */
+        .container { max-width: 1000px; margin: 40px auto; text-align: center; padding: 20px; }
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0, 0, 0, 0.5); /* 半透明黑色遮罩 */
+            display: flex; justify-content: center; align-items: flex-start; /* 顶部对齐 */
+            padding-top: 50px; 
+            z-index: 1000;
+            opacity: 0; pointer-events: none; transition: opacity 0.3s ease;
+        }
+        .modal-overlay.active { opacity: 1; pointer-events: auto; }
+
+        .modal-content {
+            background-color: #fff; width: 95%; max-width: 1100px;
+            border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            display: flex; flex-direction: column; max-height: 90vh; /* 防止超出屏幕 */
+        }
+
+        /* --- 3. 弹窗头部 & 底部 (Header & Footer) --- */
+        .modal-header { padding: 15px 20px; border-bottom: 1px solid #dee2e6; display: flex; justify-content: space-between; align-items: center; }
+        .modal-title { margin: 0; font-size: 1.25rem; font-weight: 600; }
+        .btn-close { background: transparent; border: none; font-size: 1.5rem; cursor: pointer; color: #999; }
+        
+        .modal-footer { padding: 15px 20px; border-top: 1px solid #dee2e6; display: flex; justify-content: flex-end; gap: 10px; }
+
+        /* --- 4. 弹窗主体 (Body) --- */
+        .modal-body { padding: 20px; overflow-y: auto; background-color: #f8f9fa; }
+        
+        /* 面板卡片样式 */
+        .config-panel { background: #fff; padding: 20px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #e9ecef; margin-bottom: 20px; }
+        
+        /* 标题样式 */
+        .section-title { font-size: 1rem; font-weight: 700; color: #2c3e50; border-left: 4px solid #0d6efd; padding-left: 10px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+
+        /* --- 5. 表单元素 (Form Elements) --- */
+        .row { display: flex; flex-wrap: wrap; margin: 0 -10px; }
+        .col { padding: 0 10px; flex: 1; }
+        .col-3 { width: 25%; padding: 0 10px; }
+        .col-4 { width: 33.33%; padding: 0 10px; }
+        .col-6 { width: 50%; padding: 0 10px; }
+        .col-8 { width: 66.66%; padding: 0 10px; }
+        .mb-3 { margin-bottom: 15px; }
+
+        label { display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.85rem; color: #555; }
+        
+        input[type="text"], input[type="number"], select {
+            width: 100%; padding: 8px 10px; font-size: 14px;
+            border: 1px solid #ced4da; border-radius: 4px; outline: none; transition: border-color 0.2s;
+        }
+        input:focus, select:focus { border-color: #86b7fe; box-shadow: 0 0 0 3px rgba(13,110,253,.25); }
+        
+        /* Input Group (60%) */
+        .input-group { display: flex; }
+        .input-group input { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+        .input-group-text { background: #e9ecef; border: 1px solid #ced4da; border-left: 0; padding: 8px 12px; border-radius: 0 4px 4px 0; color: #495057; font-size: 14px; }
+
+        .select-help { font-size: 12px; color: #888; margin-top: 4px; }
+        
+        /* Checkbox组样式 */
+        .checkbox-group label { display: inline-block; margin-bottom: 0; vertical-align: middle; }
+        .checkbox-group input[type="checkbox"] { vertical-align: middle; }
+
+        /* --- 6. 按钮样式 (Buttons) --- */
+        .btn { padding: 8px 16px; border-radius: 4px; font-size: 14px; cursor: pointer; border: 1px solid transparent; transition: all 0.2s; font-family: inherit; }
+        .btn-primary { background-color: #0d6efd; color: #fff; }
+        .btn-primary:hover { background-color: #0b5ed7; }
+        .btn-secondary { background-color: #6c757d; color: #fff; }
+        .btn-secondary:hover { background-color: #5c636a; }
+        .btn-outline { background: transparent; border: 1px solid #6c757d; color: #6c757d; }
+        .btn-outline:hover { background: #6c757d; color: #fff; }
+        .btn-sm { padding: 4px 8px; font-size: 12px; }
+        .btn-link { background: none; color: #dc3545; border: none; font-size: 18px; padding: 0; }
+        .btn-link:hover { color: #bb2d3b; }
+
+        /* --- 7. 表格样式 (Table) --- */
+        /* 表格容器 */
+        .table-responsive {
+            overflow-x: auto;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            position: relative;
+            width: 100%;
+            display: block;
+            margin: 0;
+            padding: 0;
+            max-width: 100%;
+            /* 确保容器本身不会被压缩 */
+            flex-shrink: 0;
+        }
+        
+        /* 表格本身 */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            border-spacing: 0;
+            background: #fff;
+            min-width: 100%; /* 确保表格至少占满容器宽度 */
+            table-layout: auto; /* 让列宽根据内容自动调整 */
+            margin: 0;
+        }
+        
+        /* 表头 */
+        th {
+            background-color: #f1f3f5;
+            color: #495057;
+            font-weight: 600;
+            text-align: left;
+            padding: 10px;
+            font-size: 13px;
+            border-bottom: 2px solid #dee2e6;
+            white-space: nowrap;
+            box-sizing: border-box;
+        }
+        
+        /* 单元格 */
+        td {
+            padding: 8px 10px;
+            border-bottom: 1px solid #dee2e6;
+            vertical-align: middle;
+            white-space: nowrap;
+            box-sizing: border-box;
+        }
+        
+        tr:last-child td {
+            border-bottom: none;
+        }
+        
+        /* 动态列样式 - 固定宽度120px */
+        th.dynamic-col {
+            background-color: #e7f1ff;
+            color: #004085;
+            min-width: 120px;
+            width: 120px;
+        }
+        
+        /* 确保动态列的单元格也固定宽度120px */
+        td:nth-child(n+2):not(.freeze-col-mode):not(.freeze-col-score):not(.freeze-col-action) {
+            min-width: 120px;
+            width: 120px;
+        }
+        
+        /* 表格输入框样式 */
+        td input[type="text"],
+        td input[type="number"],
+        td select {
+            width: 100%;
+            min-width: 120px;
+            box-sizing: border-box;
+        }
+        
+        /* 特定列宽微调 */
+        .w-50px {
+            width: 50px;
+            text-align: center;
+        }
+        
+        .w-action {
+            width: 60px;
+            text-align: center;
+        }
+        
+        /* 列冻结样式 - 使用右侧固定方案 */
+        /* 匹配模式列 */
+        th.freeze-col-mode {
+            position: -webkit-sticky;
+            position: sticky;
+            right: 180px;
+            background-color: #f1f3f5 !important;
+            z-index: 1000;
+            border-left: 2px solid #ddd;
+            width: 140px;
+            box-shadow: -3px 0 8px rgba(0,0,0,0.08);
+        }
+        
+        td.freeze-col-mode {
+            position: -webkit-sticky;
+            position: sticky;
+            right: 180px;
+            background-color: #fff !important;
+            z-index: 1000;
+            border-left: 2px solid #ddd;
+            width: 140px;
+            box-shadow: -3px 0 8px rgba(0,0,0,0.08);
+        }
+        
+        /* 分数列 */
+        th.freeze-col-score {
+            position: -webkit-sticky;
+            position: sticky;
+            right: 60px;
+            background-color: #f1f3f5 !important;
+            z-index: 1010;
+            border-left: 2px solid #ddd;
+            width: 120px;
+            box-shadow: -3px 0 8px rgba(0,0,0,0.08);
+        }
+        
+        td.freeze-col-score {
+            position: -webkit-sticky;
+            position: sticky;
+            right: 60px;
+            background-color: #fff !important;
+            z-index: 1010;
+            border-left: 2px solid #ddd;
+            width: 120px;
+            box-shadow: -3px 0 8px rgba(0,0,0,0.08);
+        }
+        
+        /* 操作列 */
+        th.freeze-col-action {
+            position: -webkit-sticky;
+            position: sticky;
+            right: 0;
+            background-color: #f1f3f5 !important;
+            z-index: 1020;
+            border-left: 2px solid #ddd;
+            width: 60px;
+            box-shadow: -3px 0 8px rgba(0,0,0,0.08);
+        }
+        
+        td.freeze-col-action {
+            position: -webkit-sticky;
+            position: sticky;
+            right: 0;
+            background-color: #fff !important;
+            z-index: 1020;
+            border-left: 2px solid #ddd;
+            width: 60px;
+            box-shadow: -3px 0 8px rgba(0,0,0,0.08);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 页面入口 -->
+    <div class="container">
+        <h2 style="color: #333;">优先级因子配置</h2>
+        <p style="color: #666; margin-bottom: 30px;">现在样式已内嵌，点击下方按钮即可预览</p>
+        <button type="button" class="btn btn-primary" onclick="openModal()">
+            打开配置弹窗
+        </button>
+    </div>
+
+    <!-- Modal 遮罩层 -->
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal-content">
+            <!-- 头部 -->
+            <div class="modal-header">
+                <h5 class="modal-title">优先级评分规则配置</h5>
+                <button type="button" class="btn-close" onclick="closeModal()">×</button>
+            </div>
+            
+            <!-- 内容区域 -->
+            <div class="modal-body">
+                
+                <!-- 第一部分：基础设置 -->
+                <div class="config-panel">
+                    <div class="section-title">1. 评分组基础设置</div>
+                    
+                    <div class="row">
+                        <div class="col-3 mb-3">
+                            <label>评分组名称</label>
+                            <input type="text" value="Group_1" placeholder="例如：库存优先组">
+                        </div>
+                        <div class="col-3 mb-3">
+                            <label>评分组权重</label>
+                            <div class="input-group">
+                                <input type="number" value="60">
+                                <span class="input-group-text">%</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-6 mb-3">
+                            <label>因子来源+关联字段</label>
+                            <div style="display: flex; flex-direction: column; gap: 3px;">
+                                <input type="text" id="sourceSearch" placeholder="搜索表..." style="padding: 5px 8px; font-size: 13px; border: 1px solid #ced4da; border-radius: 4px; margin-bottom: 5px;">
+                                <div id="sourceTableSelect" class="checkbox-group" style="height: 200px; overflow-y: auto; border: 1px solid #ced4da; border-radius: 4px; padding: 5px;">
+                                    <!-- JS填充checkbox -->
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-6 mb-3">
+                            <label>选择参与计算的因子</label>
+                            <div style="display: flex; flex-direction: column; gap: 3px;">
+                                <input type="text" id="factorSearch" placeholder="搜索因子..." style="padding: 5px 8px; font-size: 13px; border: 1px solid #ced4da; border-radius: 4px; margin-bottom: 5px;">
+                                <div id="factorSelect" class="checkbox-group" style="height: 200px; overflow-y: auto; border: 1px solid #ced4da; border-radius: 4px; padding: 5px;">
+                                    <!-- JS填充checkbox -->
+                                </div>
+                            </div>
+                            <div class="select-help">选择字段后，下方将自动生成对应的输入列</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 第二部分：规则明细 -->
+                <div class="config-panel" style="margin-bottom: 0;">
+                    <div class="section-title">
+                        <span>规则配置明细</span>
+                        <div>
+                            <button class="btn btn-outline btn-sm" onclick="loadDemoData()">加载演示数据</button>
+                            <button class="btn btn-primary btn-sm" onclick="addRuleRow()">+ 添加规则行</button>
+                        </div>
+                    </div>
+                    
+                    <!-- 新方案：输入框组形式 -->
+                    <div style="max-height: 300px; overflow-y: auto; padding: 5px;">
+                        <!-- 添加滚动条样式 -->
+                        <style>
+                            /* 自定义滚动条样式 */
+                            #rulesContainer::-webkit-scrollbar {
+                                height: 8px;
+                            }
+                            
+                            #rulesContainer::-webkit-scrollbar-track {
+                                background: #f1f1f1;
+                                border-radius: 4px;
+                            }
+                            
+                            #rulesContainer::-webkit-scrollbar-thumb {
+                                background: #ccc;
+                                border-radius: 4px;
+                            }
+                            
+                            #rulesContainer::-webkit-scrollbar-thumb:hover {
+                                background: #999;
+                            }
+                        </style>
+                        <div id="noRulesMessage" style="text-align: center; padding: 20px; color: #999; border: 1px solid #dee2e6; border-radius: 4px;">
+                            请先在上方选择"计算因子"并点击"添加规则行"
+                        </div>
+                        <div id="rulesContainer" style="overflow-x: auto;">
+                            <!-- 规则行将在这里动态生成 -->
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- 底部 -->
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal()">取消</button>
+                <button type="button" class="btn btn-primary" onclick="alert('配置已保存！')">保存配置</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 逻辑脚本 -->
+    <script>
+        // --- 0. 弹窗控制逻辑 ---
+        function openModal() {
+            document.getElementById('modalOverlay').classList.add('active');
+        }
+        function closeModal() {
+            document.getElementById('modalOverlay').classList.remove('active');
+        }
+
+        // --- 1. 虚拟元数据 ---
+        const databaseSchema = {
+            "tb_stock": {
+                name: "库存点物品表",
+                fields: ["pspid", "Product_Family", "Model_Name", "Phase", "UFS_Protocol", "Project"]
+            },
+            "tb_demand": {
+                name: "需求汇总数据表",
+                fields: ["demandid", "demand_type", "qty", "due_date"]
+            },
+            "tb_customer": {
+                name: "客户表",
+                fields: ["customerid", "customer_code", "region", "country"]
+            }
+        };
+
+        // 存储已选中的因子
+        let selectedFactorsMap = new Map();
+        
+        // --- 2. 初始化加载 ---
+        document.addEventListener('DOMContentLoaded', function() {
+            const sourceSelect = document.getElementById('sourceTableSelect');
+            
+            // 创建来源表选项的辅助函数
+            function createTableOption(tableKey) {
+                let checkboxWrapper = document.createElement('div');
+                checkboxWrapper.style.marginBottom = '8px';
+                checkboxWrapper.style.display = 'flex';
+                checkboxWrapper.style.alignItems = 'center';
+                checkboxWrapper.dataset.tableKey = tableKey;
+                
+                let checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.id = 'source_' + tableKey;
+                checkbox.value = tableKey;
+                checkbox.name = 'sourceTable';
+                
+                let label = document.createElement('label');
+                label.htmlFor = checkbox.id;
+                label.textContent = databaseSchema[tableKey].name;
+                label.style.marginLeft = '5px';
+                label.style.fontSize = '14px';
+                label.style.cursor = 'pointer';
+                label.style.width = '40%'; // 减小表名宽度
+                label.style.textOverflow = 'ellipsis';
+                label.style.whiteSpace = 'nowrap';
+                label.style.overflow = 'hidden';
+                
+                // 创建关联字段选择器容器
+                let joinSelectContainer = document.createElement('div');
+                joinSelectContainer.id = 'join_' + tableKey;
+                joinSelectContainer.style.display = 'none'; // 初始隐藏
+                joinSelectContainer.style.width = '60%'; // 增加宽度，因为表名宽度减小了
+                joinSelectContainer.style.marginLeft = '0'; // 不再靠右对齐，直接跟在表名后面
+                
+                // 为需求汇总数据表添加特殊处理
+                if (tableKey === 'tb_demand') {
+                    let noJoinText = document.createElement('span');
+                    noJoinText.textContent = '无需关联';
+                    noJoinText.style.color = '#888';
+                    noJoinText.style.fontSize = '13px';
+                    joinSelectContainer.appendChild(noJoinText);
+                } else {
+                    // 为其他表创建关联字段选择器（仅展示关联字段）
+                    // 添加抬头名称
+                    let headerRow = document.createElement('div');
+                    headerRow.style.display = 'flex';
+                    headerRow.style.gap = '5px';
+                    headerRow.style.marginBottom = '3px';
+                    headerRow.style.fontWeight = 'bold';
+                    headerRow.style.fontSize = '12px';
+                    headerRow.style.color = '#555';
+                    
+                    let joinFieldHeader = document.createElement('div');
+                    joinFieldHeader.style.width = '60%';
+                    joinFieldHeader.textContent = '关联字段';
+                    
+                    let emptyDiv = document.createElement('div');
+                    emptyDiv.style.width = '40%'; // 为添加按钮和删除按钮预留空间
+                    
+                    headerRow.appendChild(joinFieldHeader);
+                    headerRow.appendChild(emptyDiv);
+                    joinSelectContainer.appendChild(headerRow);
+                    
+                    // 创建第一组关联条件
+                    let conditionGroup = document.createElement('div');
+                    conditionGroup.style.display = 'flex';
+                    conditionGroup.style.gap = '5px';
+                    conditionGroup.style.marginBottom = '3px';
+                    
+                    // 需求字段选择器（仅作为内部配置使用，不在界面上展示）
+                    let demandFieldSelect = document.createElement('select');
+                    demandFieldSelect.className = 'demand-field';
+                    demandFieldSelect.style.width = '0';
+                    demandFieldSelect.style.display = 'none';
+                    demandFieldSelect.style.fontSize = '13px';
+                    // 需求字段应该从需求汇总数据表中选择
+                    databaseSchema['tb_demand'].fields.forEach(field => {
+                        let opt = document.createElement('option');
+                        opt.value = field;
+                        opt.text = field;
+                        if(field.includes('id')) opt.selected = true;
+                        demandFieldSelect.appendChild(opt);
+                    });
+                    
+                    // 关联字段选择器
+                    let joinFieldSelect = document.createElement('select');
+                    joinFieldSelect.className = 'join-field';
+                    joinFieldSelect.style.width = '60%';
+                    joinFieldSelect.style.fontSize = '13px';
+                    databaseSchema[tableKey].fields.forEach(field => {
+                        let opt = document.createElement('option');
+                        opt.value = field;
+                        opt.text = field;
+                        if(field.includes('id') || field.includes('pspid')) opt.selected = true;
+                        joinFieldSelect.appendChild(opt);
+                    });
+                    
+                    // 删除按钮
+                    let deleteBtn = document.createElement('button');
+                    deleteBtn.className = 'btn btn-link btn-sm';
+                    deleteBtn.innerHTML = '×';
+                    deleteBtn.style.padding = '0';
+                    deleteBtn.style.width = '20%';
+                    deleteBtn.style.visibility = 'hidden'; // 使用visibility:hidden保留空间，确保与后续行对齐
+                    deleteBtn.style.display = 'inline-block'; // 保持display为inline-block以占据空间
+                    // 第一行的删除按钮永远不显示，所以不需要添加事件监听器
+                    deleteBtn.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        // 第一行条件组不能被删除
+                    });
+                    
+                    // 添加按钮
+                    let addBtn = document.createElement('button');
+                    addBtn.className = 'btn btn-outline btn-sm';
+                    addBtn.innerHTML = '+';
+                    addBtn.style.fontSize = '12px';
+                    addBtn.style.padding = '2px 5px';
+                    addBtn.style.width = '20%';
+                    addBtn.addEventListener('click', function() {
+                        // 创建新的关联条件组
+                        let newConditionGroup = document.createElement('div');
+                        newConditionGroup.style.display = 'flex';
+                        newConditionGroup.style.gap = '5px';
+                        newConditionGroup.style.marginBottom = '3px';
+                        
+                        // 复制关联字段选择器
+                        let newJoinFieldSelect = joinFieldSelect.cloneNode(true);
+                        
+                        // 创建删除按钮
+                        let newDeleteBtn = document.createElement('button');
+                        newDeleteBtn.className = 'btn btn-link btn-sm';
+                        newDeleteBtn.innerHTML = '×';
+                        newDeleteBtn.style.padding = '0';
+                        newDeleteBtn.style.width = '20%';
+                        newDeleteBtn.addEventListener('click', function() {
+                            newConditionGroup.remove();
+                            // 检查是否只剩一个条件组
+                            const groups = joinSelectContainer.querySelectorAll('div');
+                            const conditionGroups = [];
+                            groups.forEach(group => {
+                                if (group.querySelector('.demand-field')) {
+                                    conditionGroups.push(group);
+                                }
+                            });
+                            if (conditionGroups.length === 1) {
+                                // 只剩一个条件组，隐藏删除按钮
+                                const singleDeleteBtn = conditionGroups[0].querySelector('.btn-link');
+                                if (singleDeleteBtn) {
+                                    singleDeleteBtn.style.display = 'none';
+                                }
+                                // 恢复表头占位宽度
+                                const headerEmptyDiv = joinSelectContainer.querySelector('div:nth-child(1) > div:nth-child(3)');
+                                if (headerEmptyDiv) {
+                                    headerEmptyDiv.style.width = '20%'; // 保持20%的宽度
+                                }
+                            }
+                        });
+                        
+                        newConditionGroup.appendChild(newJoinFieldSelect);
+                        // 创建一个占位div来保持宽度比例
+                        let placeholder = document.createElement('div');
+                        placeholder.style.width = '20%';
+                        placeholder.style.height = '20px';
+                        newConditionGroup.appendChild(placeholder);
+                        newConditionGroup.appendChild(newDeleteBtn);
+                        
+                        // 插入到当前条件组之后
+                        conditionGroup.parentNode.insertBefore(newConditionGroup, conditionGroup.nextSibling);
+                        
+                        // 显示新条件组的删除按钮
+                        newDeleteBtn.style.display = 'inline-block';
+                        // 第一行永远不显示删除按钮，所以不执行 deleteBtn.style.display = 'inline-block';
+                        // 更新表头的占位宽度
+                        const headerEmptyDiv = joinSelectContainer.querySelector('div:nth-child(1) > div:nth-child(3)');
+                        if (headerEmptyDiv) {
+                            headerEmptyDiv.style.width = '20%';
+                        }
+                    });
+                    
+                    conditionGroup.appendChild(demandFieldSelect);
+                    conditionGroup.appendChild(joinFieldSelect);
+                    conditionGroup.appendChild(addBtn);
+                    conditionGroup.appendChild(deleteBtn);
+                    // 确保第一行和后续行的flex布局一致
+                    conditionGroup.style.alignItems = 'center';
+                    
+                    joinSelectContainer.appendChild(conditionGroup);
+                }
+                
+                // 添加点击交互：点击来源表时显示该来源的所有字段
+                checkbox.addEventListener('click', function(e) {
+                    // 切换选中状态
+                    this.checked = !this.checked;
+                    
+                    // 切换关联字段选择器的显示状态
+                    if (this.checked) {
+                        joinSelectContainer.style.display = 'block';
+                    } else {
+                        joinSelectContainer.style.display = 'none';
+                    }
+                    
+                    // 更新依赖字段
+                    updateDependentFields();
+                });
+                
+                label.addEventListener('click', function(e) {
+                    // 阻止label的默认行为，因为我们在checkbox上处理了点击事件
+                    e.preventDefault();
+                    const checkbox = document.getElementById(this.htmlFor);
+                    // 切换选中状态
+                    checkbox.checked = !checkbox.checked;
+                    
+                    // 切换关联字段选择器的显示状态
+                    const joinContainer = document.getElementById('join_' + checkbox.value);
+                    if (checkbox.checked) {
+                        joinContainer.style.display = 'block';
+                    } else {
+                        joinContainer.style.display = 'none';
+                    }
+                    
+                    // 更新依赖字段
+                    updateDependentFields();
+                });
+                
+                checkboxWrapper.appendChild(checkbox);
+                checkboxWrapper.appendChild(label);
+                checkboxWrapper.appendChild(joinSelectContainer);
+                sourceSelect.appendChild(checkboxWrapper);
+            }
+            
+            // 初始化来源表选项为checkbox
+            // 先处理需求汇总数据表，确保它排在第一位
+            createTableOption('tb_demand');
+            
+            // 再处理其他表
+            for (let key in databaseSchema) {
+                if (key !== 'tb_demand') {
+                    createTableOption(key);
+                }
+            }
+
+            // 绑定事件
+            sourceSelect.addEventListener('change', updateDependentFields);
+            document.getElementById('factorSelect').addEventListener('change', updateTableHeader);
+            
+            // 绑定搜索事件
+            document.getElementById('sourceSearch').addEventListener('input', function(e) {
+                const searchTerm = e.target.value.toLowerCase();
+                const sourceSelect = document.getElementById('sourceTableSelect');
+                const tableWrappers = sourceSelect.querySelectorAll('[data-table-key]');
+                
+                tableWrappers.forEach(wrapper => {
+                    const tableKey = wrapper.dataset.tableKey;
+                    const tableName = databaseSchema[tableKey].name.toLowerCase();
+                    
+                    if (tableName.includes(searchTerm)) {
+                        wrapper.style.display = 'flex';
+                    } else {
+                        wrapper.style.display = 'none';
+                    }
+                });
+            });
+            
+            document.getElementById('factorSearch').addEventListener('input', function(e) {
+                const searchTerm = e.target.value.toLowerCase();
+                const factorSelect = document.getElementById('factorSelect');
+                const factorWrappers = factorSelect.querySelectorAll('div');
+                
+                // 存储所有表标题和对应的因子
+                const tableGroups = [];
+                let currentTable = null;
+                let currentFactors = [];
+                
+                // 先将所有元素分组为表标题和因子
+                factorWrappers.forEach(wrapper => {
+                    if (wrapper.style.fontWeight === 'bold') {
+                        // 如果有当前表，先保存
+                        if (currentTable) {
+                            tableGroups.push({ table: currentTable, factors: currentFactors });
+                        }
+                        // 开始新表
+                        currentTable = wrapper;
+                        currentFactors = [];
+                    } else if (wrapper.querySelector('label')) {
+                        // 添加因子到当前表
+                        currentFactors.push(wrapper);
+                    }
+                });
+                
+                // 保存最后一个表
+                if (currentTable) {
+                    tableGroups.push({ table: currentTable, factors: currentFactors });
+                }
+                
+                // 处理每个表组
+                tableGroups.forEach(group => {
+                    const tableTitle = group.table;
+                    const factors = group.factors;
+                    
+                    // 检查是否有匹配的因子
+                    const hasMatch = factors.some(factorWrapper => {
+                        const label = factorWrapper.querySelector('label');
+                        return label && label.textContent.toLowerCase().includes(searchTerm);
+                    });
+                    
+                    if (hasMatch) {
+                        // 显示表标题
+                        tableTitle.style.display = 'block';
+                        
+                        // 显示匹配的因子，隐藏不匹配的
+                        factors.forEach(factorWrapper => {
+                            const label = factorWrapper.querySelector('label');
+                            if (label && label.textContent.toLowerCase().includes(searchTerm)) {
+                                factorWrapper.style.display = 'block';
+                            } else {
+                                factorWrapper.style.display = 'none';
+                            }
+                        });
+                    } else {
+                        // 隐藏表标题和所有因子
+                        tableTitle.style.display = 'none';
+                        factors.forEach(factorWrapper => {
+                            factorWrapper.style.display = 'none';
+                        });
+                    }
+                });
+            });
+        });
+
+        // --- 3. 核心逻辑：更新关联字段和因子选择器 ---
+        function updateDependentFields() {
+            const sourceSelect = document.getElementById('sourceTableSelect');
+            const factorSelect = document.getElementById('factorSelect');
+            
+            // 保存当前选中的因子状态
+            const currentCheckedFactors = Array.from(factorSelect.querySelectorAll('input[type="checkbox"]:checked')).map(checkbox => checkbox.value);
+            currentCheckedFactors.forEach(factor => {
+                selectedFactorsMap.set(factor, true);
+            });
+            
+            // 从checkbox组获取选中值
+            const selectedTables = Array.from(sourceSelect.querySelectorAll('input[type="checkbox"]:checked')).map(checkbox => checkbox.value);
+            
+            // 显示/隐藏关联字段选择器
+            const joinSelectContainers = sourceSelect.querySelectorAll('[id^="join_"]');
+            joinSelectContainers.forEach(container => {
+                container.style.display = 'none';
+            });
+            
+            selectedTables.forEach(tableKey => {
+                const joinContainer = document.getElementById('join_' + tableKey);
+                if (joinContainer) {
+                    joinContainer.style.display = 'block';
+                }
+            });
+
+            // 更新因子选择器为checkbox
+            factorSelect.innerHTML = '';
+            if (selectedTables.length === 0) {
+                factorSelect.innerHTML = '<div style="color:#888; padding:10px; font-size:14px;">请先选择来源表</div>';
+            } else {
+                selectedTables.forEach(tableKey => {
+                    const tableInfo = databaseSchema[tableKey];
+                    
+                    // 创建表名标题
+                    let tableTitle = document.createElement('div');
+                    tableTitle.style.fontWeight = 'bold';
+                    tableTitle.style.fontSize = '14px';
+                    tableTitle.style.marginBottom = '5px';
+                    tableTitle.style.marginTop = '8px';
+                    tableTitle.textContent = tableInfo.name;
+                    factorSelect.appendChild(tableTitle);
+                    
+                    // 创建字段checkbox
+                    tableInfo.fields.forEach(field => {
+                        let checkboxWrapper = document.createElement('div');
+                        checkboxWrapper.style.marginBottom = '3px';
+                        checkboxWrapper.style.marginLeft = '15px';
+                        
+                        let checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        checkbox.id = 'factor_' + tableKey + '_' + field;
+                        checkbox.value = `${tableKey}.${field}`;
+                        checkbox.name = 'factorField';
+                        
+                        // 恢复之前的勾选状态
+                        if (selectedFactorsMap.has(checkbox.value)) {
+                            checkbox.checked = true;
+                        }
+                        
+                        let label = document.createElement('label');
+                        label.htmlFor = checkbox.id;
+                        label.textContent = field; // 只显示字段名
+                        label.style.marginLeft = '5px';
+                        label.style.fontSize = '14px';
+                        label.title = `来自${tableInfo.name}表的${field}字段`; // 保留提示信息
+                        
+                        checkboxWrapper.appendChild(checkbox);
+                        checkboxWrapper.appendChild(label);
+                        factorSelect.appendChild(checkboxWrapper);
+                    });
+                });
+            }
+            
+            updateTableHeader(); 
+        }
+
+        // --- 4. 核心逻辑：更新规则配置明细显示 ---
+        let currentSelectedFactors = []; 
+
+        function updateTableHeader() {
+            const factorSelect = document.getElementById('factorSelect');
+            const rulesContainer = document.getElementById('rulesContainer');
+            const noRulesMessage = document.getElementById('noRulesMessage');
+
+            // 获取所有因子复选框
+            const allCheckboxes = factorSelect.querySelectorAll('input[type="checkbox"]');
+            const checkedCheckboxes = factorSelect.querySelectorAll('input[type="checkbox"]:checked');
+            
+            // 更新selectedFactorsMap
+            allCheckboxes.forEach(checkbox => {
+                if (checkbox.checked) {
+                    selectedFactorsMap.set(checkbox.value, true);
+                } else {
+                    selectedFactorsMap.delete(checkbox.value);
+                }
+            });
+
+            // 从checkbox组获取选中的因子
+            currentSelectedFactors = Array.from(checkedCheckboxes).map(checkbox => {
+                const label = factorSelect.querySelector(`label[for="${checkbox.id}"]`);
+                return { name: label.textContent, fullKey: checkbox.value };
+            });
+
+            // 清空现有规则
+            rulesContainer.innerHTML = '';
+
+            if (currentSelectedFactors.length === 0) {
+                // 显示提示信息
+                rulesContainer.innerHTML = `
+                    <div id="noRulesMessage" style="text-align: center; padding: 20px; color: #999; border: 1px solid #dee2e6; border-radius: 4px;">
+                        请先在上方选择"计算因子"
+                    </div>
+                `;
+                return;
+            }
+
+            // 隐藏提示信息
+            if (noRulesMessage) {
+                noRulesMessage.style.display = 'none';
+            }
+        }
+
+        // --- 5. 添加规则行 ---
+        function addRuleRow(data = null) {
+            if (currentSelectedFactors.length === 0) {
+                alert("请先选择参与计算的因子");
+                return;
+            }
+
+            const rulesContainer = document.getElementById('rulesContainer');
+            const noRulesMessage = document.getElementById('noRulesMessage');
+            
+            // 如果提示信息存在，隐藏它
+            if (noRulesMessage) {
+                noRulesMessage.remove();
+            }
+            
+            // 获取当前行号
+            const ruleRows = document.querySelectorAll('.rule-row');
+            const rowIdx = ruleRows.length + 1;
+            
+            // 创建规则行容器
+            const ruleRow = document.createElement('div');
+            ruleRow.className = 'rule-row';
+            ruleRow.style.display = 'flex';
+            ruleRow.style.flexDirection = 'column';
+            ruleRow.style.padding = '10px';
+            ruleRow.style.border = '1px solid #dee2e6';
+            ruleRow.style.borderRadius = '4px';
+            ruleRow.style.marginBottom = '10px';
+            ruleRow.style.background = '#fff';
+            
+            // 创建第一行：行号 + 动态因子输入框
+            const firstRow = document.createElement('div');
+            firstRow.style.display = 'flex';
+            firstRow.style.alignItems = 'center';
+            firstRow.style.marginBottom = '8px';
+            
+            // 行号
+            const rowNumber = document.createElement('div');
+            rowNumber.style.width = '50px';
+            rowNumber.style.textAlign = 'center';
+            rowNumber.style.color = '#888';
+            rowNumber.style.marginRight = '10px';
+            rowNumber.style.flexShrink = '0';
+            rowNumber.textContent = rowIdx;
+            firstRow.appendChild(rowNumber);
+            
+            // 创建动态因子输入框容器
+            const dynamicFactorsContainer = document.createElement('div');
+            dynamicFactorsContainer.style.display = 'flex';
+            dynamicFactorsContainer.style.flex = '1';
+            dynamicFactorsContainer.style.minWidth = '0'; // 允许容器收缩
+            dynamicFactorsContainer.style.overflowX = 'auto'; // 添加水平滚动条
+            dynamicFactorsContainer.style.paddingBottom = '5px'; // 为滚动条预留空间
+            
+            // 动态因子输入框
+            currentSelectedFactors.forEach((factor, index) => {
+                const val = data ? (data.values[index] || '') : '';
+                const factorInput = document.createElement('input');
+                factorInput.type = 'text';
+                
+                // 从fullKey中解析表名和字段名
+                const [tableKey, fieldName] = factor.fullKey.split('.');
+                const tableName = databaseSchema[tableKey]?.name || tableKey;
+                
+                factorInput.placeholder = `${fieldName} 值`;
+                factorInput.value = val;
+                factorInput.style.width = '150px'; // 恢复原始宽度
+                factorInput.style.marginRight = '10px';
+                factorInput.style.padding = '6px 8px';
+                factorInput.style.border = '1px solid #ced4da';
+                factorInput.style.borderRadius = '4px';
+                factorInput.style.transition = 'all 0.2s ease'; // 添加过渡效果
+                factorInput.title = `${tableName} 表的 ${fieldName} 因子值`; // 保留提示信息
+                
+                // 添加悬停效果
+                factorInput.addEventListener('mouseenter', function() {
+                    this.style.border = '2px solid #0d6efd';
+                    this.style.backgroundColor = '#f0f7ff';
+                    this.style.boxShadow = '0 0 0 2px rgba(13, 110, 253, 0.25)';
+                });
+                
+                factorInput.addEventListener('mouseleave', function() {
+                    this.style.border = '1px solid #ced4da';
+                    this.style.backgroundColor = '#fff';
+                    this.style.boxShadow = 'none';
+                });
+                
+                dynamicFactorsContainer.appendChild(factorInput);
+            });
+            
+            firstRow.appendChild(dynamicFactorsContainer);
+            ruleRow.appendChild(firstRow);
+            
+            // 创建第二行：匹配模式 + 分值 + 删除按钮
+            const secondRow = document.createElement('div');
+            secondRow.style.display = 'flex';
+            secondRow.style.alignItems = 'center';
+            secondRow.style.marginLeft = '60px'; // 与行号对齐
+            
+            // 匹配模式
+            const matchModeSelect = document.createElement('select');
+            const matchMode = data ? data.mode : 'exact';
+            matchModeSelect.innerHTML = `
+                <option value="exact" ${matchMode === 'exact' ? 'selected' : ''}>精确匹配</option>
+                <option value="fuzzy" ${matchMode === 'fuzzy' ? 'selected' : ''}>模糊匹配</option>
+            `;
+            matchModeSelect.style.width = '100px';
+            matchModeSelect.style.marginRight = '10px';
+            matchModeSelect.style.padding = '6px 8px';
+            matchModeSelect.style.border = '1px solid #ced4da';
+            matchModeSelect.style.borderRadius = '4px';
+            secondRow.appendChild(matchModeSelect);
+            
+            // 分数
+            const scoreInput = document.createElement('input');
+            scoreInput.type = 'number';
+            scoreInput.placeholder = '0-100';
+            scoreInput.value = data ? data.score : '';
+            scoreInput.style.width = '80px';
+            scoreInput.style.marginRight = '10px';
+            scoreInput.style.padding = '6px 8px';
+            scoreInput.style.border = '1px solid #ced4da';
+            scoreInput.style.borderRadius = '4px';
+            scoreInput.style.fontWeight = 'bold';
+            scoreInput.style.color = '#0d6efd';
+            secondRow.appendChild(scoreInput);
+            
+            // 删除按钮
+            const deleteButton = document.createElement('button');
+            deleteButton.className = 'btn btn-link';
+            deleteButton.innerHTML = '×';
+            deleteButton.style.fontSize = '18px';
+            deleteButton.style.color = '#dc3545';
+            deleteButton.style.padding = '0';
+            deleteButton.style.width = '30px';
+            deleteButton.onclick = () => removeRuleRow(ruleRow);
+            secondRow.appendChild(deleteButton);
+            
+            ruleRow.appendChild(secondRow);
+            
+            // 添加到容器
+            rulesContainer.appendChild(ruleRow);
+        }
+        
+        // 移除规则行函数
+        function removeRuleRow(ruleRow) {
+            ruleRow.remove();
+            
+            // 更新所有行的序号
+            const ruleRows = document.querySelectorAll('.rule-row');
+            ruleRows.forEach((row, index) => {
+                const rowNumber = row.querySelector('div:first-child');
+                if (rowNumber) {
+                    rowNumber.textContent = index + 1;
+                }
+            });
+            
+            // 如果没有行，显示提示信息
+            if (ruleRows.length === 0) {
+                const rulesContainer = document.getElementById('rulesContainer');
+                rulesContainer.innerHTML = `
+                    <div id="noRulesMessage" style="text-align: center; padding: 20px; color: #999; border: 1px solid #dee2e6; border-radius: 4px;">
+                        请点击"添加规则行"添加规则
+                    </div>
+                `;
+            }
+        }
+
+        // --- 6. 演示数据 ---
+        function loadDemoData() {
+            // 1. 模拟选择来源表checkbox并更新依赖字段
+            const sourceSelect = document.getElementById('sourceTableSelect');
+            const sourceCheckbox = sourceSelect.querySelector('input[value="tb_stock"]');
+            if (sourceCheckbox) {
+                sourceCheckbox.checked = true;
+            }
+            updateDependentFields();
+
+            // 2. 在因子选择器重新生成后，再次模拟选择因子checkbox
+            const factorSelect = document.getElementById('factorSelect');
+            const factorCheckboxes = factorSelect.querySelectorAll('input[type="checkbox"]');
+            factorCheckboxes.forEach(checkbox => {
+                const label = factorSelect.querySelector(`label[for="${checkbox.id}"]`);
+                if (['Product_Family', 'Model_Name', 'Phase'].includes(label.textContent)) {
+                    checkbox.checked = true;
+                }
+            });
+
+            // 3. 更新表格头部和主体
+            updateTableHeader();
+
+            // 4. 填充演示数据
+            const demoRows = [
+                { values: ['A', 'B', 'C'], mode: 'exact', score: 100 },
+                { values: ['A', 'B', 'G'], mode: 'exact', score: 80 },
+                { values: ['A, B', '', 'D'], mode: 'fuzzy', score: 90 }
+            ];
+
+            // 清空现有的行
+            const dynamicTbody = document.getElementById('dynamicColumnsBody');
+            const fixedTbody = document.getElementById('fixedColumnsBody');
+            dynamicTbody.innerHTML = '';
+            fixedTbody.innerHTML = '';
+            
+            // 添加演示数据行
+            demoRows.forEach(row => addRuleRow(row));
+        }
+    </script>
+</body>
+</html>
