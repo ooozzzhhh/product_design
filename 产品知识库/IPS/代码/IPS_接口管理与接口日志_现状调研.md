@@ -3,7 +3,7 @@
 **调研时间**：2026-03-04（已在 release17 分支补充代码调研）  
 **调研时间戳**：20260304145800  
 **代码来源与范围说明**：  
-- 代码仓库：`scp-foundation/scp-foundation`（本地路径 `c:\Users\OZH\Desktop\scp-foundation\scp-foundation`）  
+- 代码仓库：`UHA/scp-foundation`（本地路径 `c:\Users\OZH\Desktop\UHA\scp-foundation`）  
 - 当前实际可见分支：`release17`（已从 `origin/release17` checkout，并以此作为本轮调研依据）。  
 - 前端实现范围：`scp-front/scp-ips-front` 中「接口管理」相关页面与 API（接口配置、接口同步控制、接口日志、场景接口数据）。  
 - 后端实现范围：`scp-dcp-api`、`scp-dcp-sdk`、`scp-dcp-service` 中与接口日志 `extApiLog`、接口配置 `ApiConfig`、中间表/场景数据 `ItfCommon`、枚举 `ApiSourceEnum` / `ApiCategoryEnum` 相关的代码。  
@@ -113,7 +113,7 @@
 
 ### 2.2 后端实现现状（基于 release17 代码）
 
-在 `scp-foundation/scp-foundation` 根目录下，release17 分支中与本需求直接相关的后端实现主要集中在 DCP 工程：
+在 `UHA/scp-foundation` 根目录下，release17 分支中与本需求直接相关的后端实现主要集中在 DCP 工程：
 
 - **接口日志 extApiLog（DCP 日志侧）**  
   - 控制器：`scp-dcp-sdk/src/main/java/com/yhl/scp/dcp/api/log/controller/ApiLogController.java`  
