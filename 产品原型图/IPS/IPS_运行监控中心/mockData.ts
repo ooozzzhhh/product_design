@@ -230,9 +230,9 @@ function getLastStepByFunction(functionId: string, moduleId: string, status: str
 
 export function generateMockHistory(): RunRecord[] {
   const records: RunRecord[] = [];
-  const statuses: ('success' | 'failed' | 'running')[] = ['success', 'success', 'failed', 'success', 'success', 'failed', 'success', 'running'];
-  const durations = ['8s', '12s', '15s', '6s', '22s', '11s', '18s', '进行中'];
-  const operators = ['管理员 (Admin)', '系统自动任务', '张三', '李四', '系统自动任务', '王五', '管理员 (Admin)', '赵六'];
+  const statuses: ('success' | 'failed' | 'running' | 'queued')[] = ['success', 'success', 'failed', 'success', 'success', 'failed', 'success', 'running', 'queued'];
+  const durations = ['8s', '12s', '15s', '6s', '22s', '11s', '18s', '进行中', '排队中'];
+  const operators = ['管理员 (Admin)', '系统自动任务', '张三', '李四', '系统自动任务', '王五', '管理员 (Admin)', '赵六', '钱七'];
 
   FUNCTION_CONFIGS.forEach((f, fi) => {
     const count = 5 + Math.floor(Math.random() * 8);
@@ -242,23 +242,23 @@ export function generateMockHistory(): RunRecord[] {
       const hour = 8 + (i % 12);
       const min = 10 + (i % 50);
       const startTime = `2026-02-0${Math.max(1, 9 - dayOffset)} ${hour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}:${(i * 7 % 60).toString().padStart(2, '0')}`;
-      const endMin = min + (status === 'running' ? 0 : 1 + (i % 5));
-      const endTime = status === 'running' ? undefined : `2026-02-0${Math.max(1, 9 - dayOffset)} ${hour.toString().padStart(2, '0')}:${Math.min(59, endMin).toString().padStart(2, '0')}:${((i * 7 + 15) % 60).toString().padStart(2, '0')}`;
+      const endMin = min + (status === 'running' || status === 'queued' ? 0 : 1 + (i % 5));
+      const endTime = (status === 'running' || status === 'queued') ? undefined : `2026-02-0${Math.max(1, 9 - dayOffset)} ${hour.toString().padStart(2, '0')}:${Math.min(59, endMin).toString().padStart(2, '0')}:${((i * 7 + 15) % 60).toString().padStart(2, '0')}`;
 
-      records.push({
+      const record: RunRecord = {
         id: `${f.runIdPrefix}-${String(899000 - fi * 100 - i).padStart(6, '0')}`,
         moduleId: f.moduleId,
         functionId: f.id,
         startTime,
         endTime,
-        duration: status === 'running' ? undefined : durations[(fi + i) % durations.length],
+        duration: (status === 'running' || status === 'queued') ? undefined : durations[(fi + i) % durations.length],
         operator: operators[(fi + i) % operators.length],
         algorithmScheme: f.moduleId === 'SCH' ? '规则式生产排程' : '标准策略',
         status,
-        progress: status === 'success' ? 100 : status === 'running' ? 35 + (i % 50) : 40 + (i % 40),
-        lastStep: getLastStepByFunction(f.id, f.moduleId, status, status === 'success' ? 100 : status === 'running' ? 35 + (i % 50) : 40 + (i % 40)),
+        progress: status === 'success' ? 100 : status === 'running' ? 35 + (i % 50) : status === 'queued' ? 0 : 40 + (i % 40),
+        lastStep: getLastStepByFunction(f.id, f.moduleId, status, status === 'success' ? 100 : status === 'running' ? 35 + (i % 50) : status === 'queued' ? 0 : 40 + (i % 40)),
         totalSteps: getProgressSteps(f.moduleId, f.id).length,
-        summary: status === 'success' ? `本次 ${f.name} 计算顺利完成，完成率达到 ${92 + (i % 6)}%。` : undefined,
+        summary: status === 'success' ? `本次 ${f.name} 计算顺利完成,完成率达到 ${92 + (i % 6)}%。` : undefined,
         runMode: i % 3 === 0 ? '仅运行变更数据' : '全量数据重算',
         policyMode: '规则模式',
         policyName: f.moduleId === 'SCH' ? '规则式生产排程策略' : '标准策略_v1',
@@ -266,7 +266,53 @@ export function generateMockHistory(): RunRecord[] {
         algorithmLogs: getLogsByFunction(f.id, status, startTime),
         results: getResultsByFunction(f.id, i, status),
         ...getVersionByModule(f.moduleId, f.id, i),
-      });
+      };
+
+      // 添加排队状态
+      if (status === 'queued') {
+        record.queueStatus = {
+          position: (i % 3) + 1,
+          estimatedWaitTime: `${(i % 5) + 2}分钟`,
+        };
+      }
+
+      // 添加节点详情（仅部分记录）
+      if (i % 3 === 0) {
+        const steps = getProgressSteps(f.moduleId, f.id);
+        record.nodeDetails = steps.map((step, idx) => {
+          const nodeStatus: 'pending' | 'running' | 'completed' | 'failed' | 'skipped' =
+            status === 'success' ? 'completed' :
+            status === 'failed' && idx === Math.floor(steps.length / 2) ? 'failed' :
+            status === 'running' && idx === getCurrentStepIndexFromProgress(record.progress, steps) ? 'running' :
+            status === 'running' && idx < getCurrentStepIndexFromProgress(record.progress, steps) ? 'completed' :
+            status === 'queued' ? 'pending' :
+            idx < getCurrentStepIndexFromProgress(record.progress, steps) ? 'completed' : 'pending';
+
+          return {
+            nodeName: step.label,
+            status: nodeStatus,
+            startTime: nodeStatus !== 'pending' ? startTime : undefined,
+            endTime: nodeStatus === 'completed' ? endTime : undefined,
+            duration: nodeStatus === 'completed' ? Math.floor(Math.random() * 30) + 5 : undefined,
+            description: step.defaultRemark,
+            isInterruptible: idx < steps.length - 1, // 最后一个节点不可中断
+            isSkippableOnError: idx % 4 === 0, // 部分节点可跳过
+            businessMetrics: nodeStatus === 'completed' ? [
+              { key: '处理物料数', value: `${Math.floor(Math.random() * 5000) + 1000}` },
+              { key: '生成计划订单', value: `${Math.floor(Math.random() * 500) + 100}` },
+            ] : undefined,
+            warningMessages: nodeStatus === 'completed' && idx % 3 === 0 ? [
+              `部分BOM数据缺失（${Math.floor(Math.random() * 20) + 5}条）`,
+            ] : undefined,
+            errorMessages: nodeStatus === 'failed' ? [
+              '数据异常导致计算中断',
+              '错误码: E001',
+            ] : undefined,
+          };
+        });
+      }
+
+      records.push(record);
     }
   });
 

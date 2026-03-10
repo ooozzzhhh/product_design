@@ -27,6 +27,8 @@ export interface FunctionConfig {
   runIdPrefix: string;
   /** 是否算法计算功能（true=算法运行日志+统一图标，false=功能运行日志） */
   isAlgorithm?: boolean;
+  /** 并发控制配置 */
+  concurrencyConfig?: ConcurrencyConfig;
 }
 
 /** 进度步骤 */
@@ -46,7 +48,7 @@ export interface RunRecord {
   duration?: string;
   operator: string;
   algorithmScheme: string;
-  status: 'success' | 'failed' | 'running' | 'terminated';
+  status: 'success' | 'failed' | 'running' | 'terminated' | 'queued';
   progress: number;
   lastStep: string;
   totalSteps?: number;
@@ -65,6 +67,12 @@ export interface RunRecord {
   planVersion?: string;
   /** 需求版本（同上） */
   demandVersion?: string;
+  /** 排队状态（仅当 status 为 'queued' 时有值） */
+  queueStatus?: QueueStatus;
+  /** 节点详情 */
+  nodeDetails?: NodeDetail[];
+  /** 性能监控指标 */
+  performanceMetrics?: PerformanceMetrics;
 }
 
 export interface RunConfig {
@@ -106,4 +114,64 @@ export interface RunOverviewStats {
   weekCount: number;
   successRate: number;
   avgDuration: string;
+}
+
+/** 并发控制模式 */
+export type ConcurrencyMode = 'PARALLEL' | 'EXCLUSIVE' | 'QUEUEABLE' | 'LIMITED_PARALLEL';
+
+/** 并发控制配置 */
+export interface ConcurrencyConfig {
+  mode: ConcurrencyMode;
+  maxConcurrency?: number; // 仅 LIMITED_PARALLEL 模式需要
+}
+
+/** 排队状态 */
+export interface QueueStatus {
+  position: number; // 排队位置
+  estimatedWaitTime?: string; // 预计等待时间
+}
+
+/** 性能监控指标 */
+export interface PerformanceMetrics {
+  jvm?: {
+    heapUsed: number;
+    heapMax: number;
+    nonHeapUsed: number;
+    gcCount: number;
+    gcTime: number;
+  };
+  thread?: {
+    threadCount: number;
+    peakThreadCount: number;
+    daemonThreadCount: number;
+  };
+  db?: {
+    activeConnections: number;
+    idleConnections: number;
+    maxConnections: number;
+  };
+  nodes?: {
+    nodeName: string;
+    duration: number;
+    processedCount: number;
+    progressPercentage: number;
+  }[];
+}
+
+/** 节点执行状态 */
+export type NodeStatus = 'pending' | 'running' | 'completed' | 'failed' | 'terminated' | 'skipped';
+
+/** 节点详情 */
+export interface NodeDetail {
+  nodeName: string;
+  status: NodeStatus;
+  startTime?: string;
+  endTime?: string;
+  duration?: number;
+  description?: string;
+  isInterruptible?: boolean; // 是否可中断
+  isSkippableOnError?: boolean; // 是否可在异常时跳过
+  businessMetrics?: { key: string; value: string }[]; // 业务指标
+  warningMessages?: string[]; // 警告信息
+  errorMessages?: string[]; // 错误信息
 }

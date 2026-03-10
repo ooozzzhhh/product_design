@@ -19,34 +19,34 @@ const ALGO_ICON = 'fa-calculator';
 /** 各模块功能点（算法功能 isAlgorithm: true 使用统一图标） */
 export const FUNCTION_CONFIGS: FunctionConfig[] = [
   // DFP
-  { id: 'dfp_demand_cleanse', moduleId: 'DFP', name: '历史需求清洗', icon: 'fa-broom', description: '清洗与预处理历史需求数据', runIdPrefix: 'DFP-CL', isAlgorithm: false },
-  { id: 'dfp_forecast_algo', moduleId: 'DFP', name: '需求预测算法', icon: ALGO_ICON, description: '执行需求预测算法计算', runIdPrefix: 'DFP-FC', isAlgorithm: true },
-  { id: 'dfp_outlier_detect', moduleId: 'DFP', name: '异常值检测', icon: ALGO_ICON, description: '识别并处理历史需求异常值', runIdPrefix: 'DFP-OL', isAlgorithm: true },
-  { id: 'dfp_seasonal_decompose', moduleId: 'DFP', name: '季节性分解', icon: ALGO_ICON, description: '需求季节性趋势分解与建模', runIdPrefix: 'DFP-SD', isAlgorithm: true },
-  { id: 'dfp_model_train', moduleId: 'DFP', name: '预测模型训练', icon: ALGO_ICON, description: '训练与优化预测模型', runIdPrefix: 'DFP-MT', isAlgorithm: true },
+  { id: 'dfp_demand_cleanse', moduleId: 'DFP', name: '历史需求清洗', icon: 'fa-broom', description: '清洗与预处理历史需求数据', runIdPrefix: 'DFP-CL', isAlgorithm: false, concurrencyConfig: { mode: 'PARALLEL' } },
+  { id: 'dfp_forecast_algo', moduleId: 'DFP', name: '需求预测算法', icon: ALGO_ICON, description: '执行需求预测算法计算', runIdPrefix: 'DFP-FC', isAlgorithm: true, concurrencyConfig: { mode: 'EXCLUSIVE' } },
+  { id: 'dfp_outlier_detect', moduleId: 'DFP', name: '异常值检测', icon: ALGO_ICON, description: '识别并处理历史需求异常值', runIdPrefix: 'DFP-OL', isAlgorithm: true, concurrencyConfig: { mode: 'QUEUEABLE' } },
+  { id: 'dfp_seasonal_decompose', moduleId: 'DFP', name: '季节性分解', icon: ALGO_ICON, description: '需求季节性趋势分解与建模', runIdPrefix: 'DFP-SD', isAlgorithm: true, concurrencyConfig: { mode: 'PARALLEL' } },
+  { id: 'dfp_model_train', moduleId: 'DFP', name: '预测模型训练', icon: ALGO_ICON, description: '训练与优化预测模型', runIdPrefix: 'DFP-MT', isAlgorithm: true, concurrencyConfig: { mode: 'LIMITED_PARALLEL', maxConcurrency: 3 } },
   // S&OP
-  { id: 'sop_plan_report', moduleId: 'S&OP', name: '产销计划报告', icon: 'fa-chart-column', description: '产销协同计划汇总报告', runIdPrefix: 'SOP-PR', isAlgorithm: false },
-  { id: 'sop_review_meeting', moduleId: 'S&OP', name: '产销评审会议', icon: 'fa-users', description: '监控已发起的产销评审会议流程当前节点', runIdPrefix: 'SOP-RM', isAlgorithm: false },
+  { id: 'sop_plan_report', moduleId: 'S&OP', name: '产销计划报告', icon: 'fa-chart-column', description: '产销协同计划汇总报告', runIdPrefix: 'SOP-PR', isAlgorithm: false, concurrencyConfig: { mode: 'PARALLEL' } },
+  { id: 'sop_review_meeting', moduleId: 'S&OP', name: '产销评审会议', icon: 'fa-users', description: '监控已发起的产销评审会议流程当前节点', runIdPrefix: 'SOP-RM', isAlgorithm: false, concurrencyConfig: { mode: 'PARALLEL' } },
   // MPS
-  { id: 'mps_supply_match', moduleId: 'MPS', name: '供需匹配计算', icon: ALGO_ICON, description: '主计划供需平衡计算', runIdPrefix: 'MPS-SM', isAlgorithm: true },
-  { id: 'mps_algo', moduleId: 'MPS', name: '主计划算法', icon: ALGO_ICON, description: '主计划优化算法运行', runIdPrefix: 'MPS-AL', isAlgorithm: true },
-  { id: 'mps_atp', moduleId: 'MPS', name: 'ATP 可承诺量计算', icon: ALGO_ICON, description: '可用量承诺与交期计算', runIdPrefix: 'MPS-AT', isAlgorithm: true },
-  { id: 'mps_capacity_load', moduleId: 'MPS', name: '产能负荷分析', icon: ALGO_ICON, description: '产能负荷与瓶颈分析', runIdPrefix: 'MPS-CL', isAlgorithm: true },
-  { id: 'mps_forecast_consume', moduleId: 'MPS', name: '预测冲减', icon: ALGO_ICON, description: '预测消耗与可用量冲减计算', runIdPrefix: 'MPS-FC', isAlgorithm: true },
+  { id: 'mps_supply_match', moduleId: 'MPS', name: '供需匹配计算', icon: ALGO_ICON, description: '主计划供需平衡计算', runIdPrefix: 'MPS-SM', isAlgorithm: true, concurrencyConfig: { mode: 'EXCLUSIVE' } },
+  { id: 'mps_algo', moduleId: 'MPS', name: '主计划算法', icon: ALGO_ICON, description: '主计划优化算法运行', runIdPrefix: 'MPS-AL', isAlgorithm: true, concurrencyConfig: { mode: 'EXCLUSIVE' } },
+  { id: 'mps_atp', moduleId: 'MPS', name: 'ATP 可承诺量计算', icon: ALGO_ICON, description: '可用量承诺与交期计算', runIdPrefix: 'MPS-AT', isAlgorithm: true, concurrencyConfig: { mode: 'QUEUEABLE' } },
+  { id: 'mps_capacity_load', moduleId: 'MPS', name: '产能负荷分析', icon: ALGO_ICON, description: '产能负荷与瓶颈分析', runIdPrefix: 'MPS-CL', isAlgorithm: true, concurrencyConfig: { mode: 'PARALLEL' } },
+  { id: 'mps_forecast_consume', moduleId: 'MPS', name: '预测冲减', icon: ALGO_ICON, description: '预测消耗与可用量冲减计算', runIdPrefix: 'MPS-FC', isAlgorithm: true, concurrencyConfig: { mode: 'PARALLEL' } },
   // SCH
-  { id: 'sch_rule_schedule', moduleId: 'SCH', name: '规则式生产排程', icon: ALGO_ICON, description: '基于规则的排程计算', runIdPrefix: 'SCH-RS', isAlgorithm: true },
-  { id: 'sch_supply_match', moduleId: 'SCH', name: '供需匹配计算', icon: ALGO_ICON, description: '排程供需平衡计算', runIdPrefix: 'SCH-SM', isAlgorithm: true },
-  { id: 'sch_capacity_balance', moduleId: 'SCH', name: '产能平衡', icon: ALGO_ICON, description: '工序与设备产能平衡', runIdPrefix: 'SCH-CB', isAlgorithm: true },
-  { id: 'sch_urgent_insert', moduleId: 'SCH', name: '插单模拟', icon: ALGO_ICON, description: '紧急插单影响模拟', runIdPrefix: 'SCH-UI', isAlgorithm: true },
-  { id: 'sch_production_feedback', moduleId: 'SCH', name: '生产反馈', icon: 'fa-message', description: '生产进度反馈采集与回写', runIdPrefix: 'SCH-PF', isAlgorithm: false },
+  { id: 'sch_rule_schedule', moduleId: 'SCH', name: '规则式生产排程', icon: ALGO_ICON, description: '基于规则的排程计算', runIdPrefix: 'SCH-RS', isAlgorithm: true, concurrencyConfig: { mode: 'EXCLUSIVE' } },
+  { id: 'sch_supply_match', moduleId: 'SCH', name: '供需匹配计算', icon: ALGO_ICON, description: '排程供需平衡计算', runIdPrefix: 'SCH-SM', isAlgorithm: true, concurrencyConfig: { mode: 'EXCLUSIVE' } },
+  { id: 'sch_capacity_balance', moduleId: 'SCH', name: '产能平衡', icon: ALGO_ICON, description: '工序与设备产能平衡', runIdPrefix: 'SCH-CB', isAlgorithm: true, concurrencyConfig: { mode: 'QUEUEABLE' } },
+  { id: 'sch_urgent_insert', moduleId: 'SCH', name: '插单模拟', icon: ALGO_ICON, description: '紧急插单影响模拟', runIdPrefix: 'SCH-UI', isAlgorithm: true, concurrencyConfig: { mode: 'PARALLEL' } },
+  { id: 'sch_production_feedback', moduleId: 'SCH', name: '生产反馈', icon: 'fa-message', description: '生产进度反馈采集与回写', runIdPrefix: 'SCH-PF', isAlgorithm: false, concurrencyConfig: { mode: 'PARALLEL' } },
   // MRP
-  { id: 'mrp_supply_match', moduleId: 'MRP', name: '供需匹配计算', icon: ALGO_ICON, description: '物料供需平衡计算', runIdPrefix: 'MRP-SM', isAlgorithm: true },
-  { id: 'mrp_algo', moduleId: 'MRP', name: '物料需求算法', icon: ALGO_ICON, description: 'MRP 物料需求计算', runIdPrefix: 'MRP-AL', isAlgorithm: true },
-  { id: 'mrp_kit_analysis', moduleId: 'MRP', name: '齐套分析', icon: ALGO_ICON, description: '订单物料齐套性分析', runIdPrefix: 'MRP-KA', isAlgorithm: true },
-  { id: 'mrp_safety_stock', moduleId: 'MRP', name: '安全库存计算', icon: ALGO_ICON, description: '安全库存与再订货点计算', runIdPrefix: 'MRP-SS', isAlgorithm: true },
+  { id: 'mrp_supply_match', moduleId: 'MRP', name: '供需匹配计算', icon: ALGO_ICON, description: '物料供需平衡计算', runIdPrefix: 'MRP-SM', isAlgorithm: true, concurrencyConfig: { mode: 'EXCLUSIVE' } },
+  { id: 'mrp_algo', moduleId: 'MRP', name: '物料需求算法', icon: ALGO_ICON, description: 'MRP 物料需求计算', runIdPrefix: 'MRP-AL', isAlgorithm: true, concurrencyConfig: { mode: 'EXCLUSIVE' } },
+  { id: 'mrp_kit_analysis', moduleId: 'MRP', name: '齐套分析', icon: ALGO_ICON, description: '订单物料齐套性分析', runIdPrefix: 'MRP-KA', isAlgorithm: true, concurrencyConfig: { mode: 'QUEUEABLE' } },
+  { id: 'mrp_safety_stock', moduleId: 'MRP', name: '安全库存计算', icon: ALGO_ICON, description: '安全库存与再订货点计算', runIdPrefix: 'MRP-SS', isAlgorithm: true, concurrencyConfig: { mode: 'PARALLEL' } },
   // IPS
-  { id: 'ips_interface_sync', moduleId: 'IPS', name: '接口同步', icon: 'fa-arrows-rotate', description: '跨系统接口数据同步', runIdPrefix: 'IPS-IS', isAlgorithm: false },
-  { id: 'ips_auto_archive', moduleId: 'IPS', name: '自动归档任务', icon: 'fa-box-archive', description: '历史数据自动归档与清理', runIdPrefix: 'IPS-AA', isAlgorithm: false },
+  { id: 'ips_interface_sync', moduleId: 'IPS', name: '接口同步', icon: 'fa-arrows-rotate', description: '跨系统接口数据同步', runIdPrefix: 'IPS-IS', isAlgorithm: false, concurrencyConfig: { mode: 'LIMITED_PARALLEL', maxConcurrency: 5 } },
+  { id: 'ips_auto_archive', moduleId: 'IPS', name: '自动归档任务', icon: 'fa-box-archive', description: '历史数据自动归档与清理', runIdPrefix: 'IPS-AA', isAlgorithm: false, concurrencyConfig: { mode: 'PARALLEL' } },
 ];
 
 /** 各功能运行按钮具象化配置（贴合业务场景） */
