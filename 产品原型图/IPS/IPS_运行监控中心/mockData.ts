@@ -82,6 +82,16 @@ function getVersionByModule(moduleId: string, functionId: string, i: number): { 
 /** 按功能生成符合其特点的运行日志 */
 function getLogsByFunction(functionId: string, status: string, startTime: string): string[] {
   const t = startTime.split(' ')[1] || '09:30:00';
+
+  // 排队状态的统一日志
+  if (status === 'queued') {
+    return [
+      `[${t}] 任务已提交`,
+      `[${t}] 检测到前序任务正在运行`,
+      `[${t}] 当前排队中，等待资源释放...`,
+    ];
+  }
+
   const logsMap: Record<string, { success: string[]; running: string[]; failed: string[] }> = {
     dfp_demand_cleanse: {
       success: [`[${t}] 数据源连接成功`, `[${t}] 清洗规则加载完成`, `[${t}] 去重、异常值剔除、补全执行完成`, `[${t}] 数据质量得分计算完成`, `[${t}] 清洗后数据已写入`],
@@ -230,20 +240,127 @@ function getLastStepByFunction(functionId: string, moduleId: string, status: str
 
 export function generateMockHistory(): RunRecord[] {
   const records: RunRecord[] = [];
-  const statuses: ('success' | 'failed' | 'running' | 'queued')[] = ['success', 'success', 'failed', 'success', 'success', 'failed', 'success', 'running', 'queued'];
-  const durations = ['8s', '12s', '15s', '6s', '22s', '11s', '18s', '进行中', '排队中'];
-  const operators = ['管理员 (Admin)', '系统自动任务', '张三', '李四', '系统自动任务', '王五', '管理员 (Admin)', '赵六', '钱七'];
+  const operators = ['管理员 (Admin)', '系统自动任务', '张三', '李四', '王五', '赵六', '钱七'];
 
   FUNCTION_CONFIGS.forEach((f, fi) => {
-    const count = 5 + Math.floor(Math.random() * 8);
-    for (let i = 0; i < count; i++) {
-      const status = statuses[(fi + i) % statuses.length];
-      const dayOffset = Math.floor(i / 2);
-      const hour = 8 + (i % 12);
-      const min = 10 + (i % 50);
-      const startTime = `2026-02-0${Math.max(1, 9 - dayOffset)} ${hour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}:${(i * 7 % 60).toString().padStart(2, '0')}`;
-      const endMin = min + (status === 'running' || status === 'queued' ? 0 : 1 + (i % 5));
-      const endTime = (status === 'running' || status === 'queued') ? undefined : `2026-02-0${Math.max(1, 9 - dayOffset)} ${hour.toString().padStart(2, '0')}:${Math.min(59, endMin).toString().padStart(2, '0')}:${((i * 7 + 15) % 60).toString().padStart(2, '0')}`;
+    const concurrencyMode = f.concurrencyConfig?.mode;
+    const maxConcurrency = f.concurrencyConfig?.maxConcurrency || 1;
+
+    // 根据并发模式严格设计数据场景
+    let recordsToGenerate: Array<{
+      status: 'success' | 'failed' | 'running' | 'queued';
+      dayOffset: number;
+      hourOffset: number;
+    }> = [];
+
+    const now = new Date();
+    const currentHour = now.getHours();
+    const currentMin = now.getMinutes();
+
+    switch (concurrencyMode) {
+      case 'PARALLEL': // 可并行：可以有多个运行中的任务
+        recordsToGenerate = [
+          // 当前运行中的任务（3个）
+          { status: 'running', dayOffset: 0, hourOffset: -2 },
+          { status: 'running', dayOffset: 0, hourOffset: -1 },
+          { status: 'running', dayOffset: 0, hourOffset: 0 },
+          // 历史成功记录
+          { status: 'success', dayOffset: 0, hourOffset: -3 },
+          { status: 'success', dayOffset: 0, hourOffset: -5 },
+          { status: 'success', dayOffset: 1, hourOffset: -2 },
+          { status: 'success', dayOffset: 1, hourOffset: -4 },
+          // 历史失败记录
+          { status: 'failed', dayOffset: 2, hourOffset: -3 },
+          { status: 'success', dayOffset: 2, hourOffset: -6 },
+        ];
+        break;
+
+      case 'EXCLUSIVE': // 不可并行：最多1个运行中，其他是历史记录
+        recordsToGenerate = [
+          // 当前运行中的任务（只能有1个）
+          { status: 'running', dayOffset: 0, hourOffset: 0 },
+          // 历史成功记录
+          { status: 'success', dayOffset: 0, hourOffset: -2 },
+          { status: 'success', dayOffset: 0, hourOffset: -4 },
+          { status: 'success', dayOffset: 1, hourOffset: -1 },
+          { status: 'success', dayOffset: 1, hourOffset: -3 },
+          // 历史失败记录
+          { status: 'failed', dayOffset: 2, hourOffset: -2 },
+          { status: 'success', dayOffset: 2, hourOffset: -5 },
+        ];
+        break;
+
+      case 'QUEUEABLE': // 可排队：最多1个运行中，可以有多个排队
+        recordsToGenerate = [
+          // 当前运行中的任务（只能有1个）
+          { status: 'running', dayOffset: 0, hourOffset: 0 },
+          // 排队中的任务（3个）
+          { status: 'queued', dayOffset: 0, hourOffset: 0 },
+          { status: 'queued', dayOffset: 0, hourOffset: 0 },
+          { status: 'queued', dayOffset: 0, hourOffset: 0 },
+          // 历史成功记录
+          { status: 'success', dayOffset: 0, hourOffset: -2 },
+          { status: 'success', dayOffset: 1, hourOffset: -1 },
+          { status: 'success', dayOffset: 1, hourOffset: -3 },
+          // 历史失败记录
+          { status: 'failed', dayOffset: 2, hourOffset: -2 },
+        ];
+        break;
+
+      case 'LIMITED_PARALLEL': // 限N并发：最多N个运行中，超过的排队
+        recordsToGenerate = [
+          // 当前运行中的任务（N个）
+          ...Array.from({ length: maxConcurrency }, (_, i) => ({
+            status: 'running' as const,
+            dayOffset: 0,
+            hourOffset: -i,
+          })),
+          // 排队中的任务（2个）
+          { status: 'queued', dayOffset: 0, hourOffset: 0 },
+          { status: 'queued', dayOffset: 0, hourOffset: 0 },
+          // 历史成功记录
+          { status: 'success', dayOffset: 0, hourOffset: -(maxConcurrency + 1) },
+          { status: 'success', dayOffset: 1, hourOffset: -1 },
+          { status: 'success', dayOffset: 1, hourOffset: -3 },
+          // 历史失败记录
+          { status: 'failed', dayOffset: 2, hourOffset: -2 },
+        ];
+        break;
+
+      default:
+        recordsToGenerate = [
+          { status: 'success', dayOffset: 0, hourOffset: -1 },
+          { status: 'success', dayOffset: 1, hourOffset: -2 },
+          { status: 'failed', dayOffset: 2, hourOffset: -1 },
+        ];
+    }
+
+    const durations = ['6s', '8s', '12s', '15s', '18s', '22s', '25s', '9s', '11s'];
+
+    recordsToGenerate.forEach((config, i) => {
+      const { status, dayOffset, hourOffset } = config;
+
+      // 计算时间
+      const recordDate = new Date(now);
+      recordDate.setDate(recordDate.getDate() - dayOffset);
+
+      let recordHour = currentHour + hourOffset;
+      if (recordHour < 0) {
+        recordHour += 24;
+        recordDate.setDate(recordDate.getDate() - 1);
+      }
+      if (recordHour >= 24) {
+        recordHour -= 24;
+        recordDate.setDate(recordDate.getDate() + 1);
+      }
+
+      const recordMin = status === 'queued' ? currentMin : (10 + (i * 7) % 50);
+      const recordSec = (i * 13) % 60;
+
+      const startTime = `${recordDate.getFullYear()}-${String(recordDate.getMonth() + 1).padStart(2, '0')}-${String(recordDate.getDate()).padStart(2, '0')} ${String(recordHour).padStart(2, '0')}:${String(recordMin).padStart(2, '0')}:${String(recordSec).padStart(2, '0')}`;
+
+      const endTime = (status === 'running' || status === 'queued') ? undefined :
+        `${recordDate.getFullYear()}-${String(recordDate.getMonth() + 1).padStart(2, '0')}-${String(recordDate.getDate()).padStart(2, '0')} ${String(recordHour).padStart(2, '0')}:${String(Math.min(59, recordMin + 1 + (i % 5))).padStart(2, '0')}:${String((recordSec + 15) % 60).padStart(2, '0')}`;
 
       const record: RunRecord = {
         id: `${f.runIdPrefix}-${String(899000 - fi * 100 - i).padStart(6, '0')}`,
@@ -251,12 +368,12 @@ export function generateMockHistory(): RunRecord[] {
         functionId: f.id,
         startTime,
         endTime,
-        duration: (status === 'running' || status === 'queued') ? undefined : durations[(fi + i) % durations.length],
+        duration: (status === 'running' || status === 'queued') ? undefined : durations[i % durations.length],
         operator: operators[(fi + i) % operators.length],
         algorithmScheme: f.moduleId === 'SCH' ? '规则式生产排程' : '标准策略',
         status,
         progress: status === 'success' ? 100 : status === 'running' ? 35 + (i % 50) : status === 'queued' ? 0 : 40 + (i % 40),
-        lastStep: getLastStepByFunction(f.id, f.moduleId, status, status === 'success' ? 100 : status === 'running' ? 35 + (i % 50) : status === 'queued' ? 0 : 40 + (i % 40)),
+        lastStep: getLastStepByFunction(f.id, f.moduleId, status, status === 'success' ? 100 : status === 'running' ? 35 + (i % 50) : 0),
         totalSteps: getProgressSteps(f.moduleId, f.id).length,
         summary: status === 'success' ? `本次 ${f.name} 计算顺利完成,完成率达到 ${92 + (i % 6)}%。` : undefined,
         runMode: i % 3 === 0 ? '仅运行变更数据' : '全量数据重算',
@@ -268,11 +385,11 @@ export function generateMockHistory(): RunRecord[] {
         ...getVersionByModule(f.moduleId, f.id, i),
       };
 
-      // 添加排队状态
+      // 添加排队状态详情
       if (status === 'queued') {
         record.queueStatus = {
-          position: (i % 3) + 1,
-          estimatedWaitTime: `${(i % 5) + 2}分钟`,
+          position: i + 1, // 排队位置从1开始
+          estimatedWaitTime: `${(i + 1) * 2}分钟`, // 预计等待时间
         };
       }
 
@@ -313,7 +430,7 @@ export function generateMockHistory(): RunRecord[] {
       }
 
       records.push(record);
-    }
+    });
   });
 
   return records.sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());

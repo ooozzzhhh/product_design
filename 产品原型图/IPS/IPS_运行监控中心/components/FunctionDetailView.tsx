@@ -92,6 +92,9 @@ const FunctionDetailView: React.FC<Props> = ({
     return Math.min(c, steps.length) - 1;
   };
   const getProgressFraction = (run: RunRecord) => {
+    if (run.status === 'queued' && run.queueStatus) {
+      return `第${run.queueStatus.position}位`;
+    }
     if (run.status === 'running') {
       const cur = getCurrentStepIndex(run);
       return `${cur + 1}/${steps.length}`;
@@ -113,7 +116,36 @@ const FunctionDetailView: React.FC<Props> = ({
         <button onClick={onBack} className="flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-indigo-600">
           <i className="fa-solid fa-arrow-left"></i> 返回功能列表
         </button>
-        <h2 className="text-lg font-black text-slate-900">{func.name}</h2>
+        <div className="flex items-center gap-3">
+          <h2 className="text-lg font-black text-slate-900">{func.name}</h2>
+          {(() => {
+            if (!func.concurrencyConfig) return null;
+            const { mode, maxConcurrency } = func.concurrencyConfig;
+            let label, color, icon;
+            switch (mode) {
+              case 'PARALLEL':
+                label = '可并行'; color = 'bg-emerald-50 text-emerald-600 border-emerald-200'; icon = 'fa-arrows-split-up-and-left';
+                break;
+              case 'EXCLUSIVE':
+                label = '不可并行'; color = 'bg-rose-50 text-rose-600 border-rose-200'; icon = 'fa-lock';
+                break;
+              case 'QUEUEABLE':
+                label = '可排队'; color = 'bg-amber-50 text-amber-600 border-amber-200'; icon = 'fa-clock';
+                break;
+              case 'LIMITED_PARALLEL':
+                label = `限${maxConcurrency}并发`; color = 'bg-indigo-50 text-indigo-600 border-indigo-200'; icon = 'fa-gauge-high';
+                break;
+              default:
+                return null;
+            }
+            return (
+              <span className={`px-3 py-1.5 rounded-lg text-xs font-bold border ${color} flex items-center gap-1.5`}>
+                <i className={`fa-solid ${icon}`}></i>
+                {label}
+              </span>
+            );
+          })()}
+        </div>
       </div>
 
         <div className="flex flex-wrap items-center justify-between gap-4">
@@ -177,20 +209,21 @@ const FunctionDetailView: React.FC<Props> = ({
               const isSuccess = run.status === 'success';
               const isRunning = run.status === 'running';
               const isTerminated = run.status === 'terminated';
+              const isQueued = run.status === 'queued';
               const compIdx = getStepIndex(run.lastStep);
               const expanded = selectedRecordId === run.id;
 
               return (
                 <div key={run.id} className="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm hover:shadow transition-all">
                   <div className="flex items-center gap-4 p-3 cursor-pointer" onClick={() => setSelectedRecordId(expanded ? null : run.id)}>
-                    <div className={`w-1.5 h-12 rounded ${isSuccess ? 'bg-emerald-500' : isRunning ? 'bg-indigo-500' : isTerminated ? 'bg-amber-500' : 'bg-rose-500'}`}></div>
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-white shrink-0 ${isSuccess ? 'bg-emerald-500' : isRunning ? 'bg-indigo-500' : isTerminated ? 'bg-amber-500' : 'bg-rose-500'}`}>
-                      {isSuccess ? <i className="fa-solid fa-check text-sm"></i> : isRunning ? <i className="fa-solid fa-spinner animate-spin text-sm"></i> : isTerminated ? <i className="fa-solid fa-minus text-sm"></i> : <i className="fa-solid fa-xmark text-sm"></i>}
+                    <div className={`w-1.5 h-12 rounded ${isSuccess ? 'bg-emerald-500' : isRunning ? 'bg-indigo-500' : isQueued ? 'bg-yellow-500' : isTerminated ? 'bg-amber-500' : 'bg-rose-500'}`}></div>
+                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-white shrink-0 ${isSuccess ? 'bg-emerald-500' : isRunning ? 'bg-indigo-500' : isQueued ? 'bg-yellow-500' : isTerminated ? 'bg-amber-500' : 'bg-rose-500'}`}>
+                      {isSuccess ? <i className="fa-solid fa-check text-sm"></i> : isRunning ? <i className="fa-solid fa-spinner animate-spin text-sm"></i> : isQueued ? <i className="fa-solid fa-clock text-sm"></i> : isTerminated ? <i className="fa-solid fa-minus text-sm"></i> : <i className="fa-solid fa-xmark text-sm"></i>}
                     </div>
                     <div className={`flex-1 min-w-0 grid gap-4 ${showVersion ? 'grid-cols-6' : 'grid-cols-5'}`}>
                       <div><span className="text-[10px] text-slate-400 uppercase">任务ID</span><div className="text-xs font-bold text-slate-800 truncate">{run.id}</div></div>
                       <div><span className="text-[10px] text-slate-400 uppercase">开始时间</span><div className="text-xs font-bold text-slate-700">{run.startTime}</div></div>
-                      <div><span className="text-[10px] text-slate-400 uppercase">时长</span><div className="text-xs font-bold">{isRunning ? '运行中' : isTerminated ? '已终止' : run.duration}</div></div>
+                      <div><span className="text-[10px] text-slate-400 uppercase">时长</span><div className="text-xs font-bold">{isRunning ? '运行中' : isQueued ? '排队中' : isTerminated ? '已终止' : run.duration}</div></div>
                       <div><span className="text-[10px] text-slate-400 uppercase">操作人</span><div className="text-xs font-bold">{run.operator}</div></div>
                       {showVersion && (
                         <div><span className="text-[10px] text-slate-400 uppercase">计划版本</span><div className="text-xs font-bold text-indigo-600">{run.planVersion ?? '-'}</div></div>
@@ -199,10 +232,11 @@ const FunctionDetailView: React.FC<Props> = ({
                     </div>
                     <div className="flex gap-2 shrink-0 w-[220px] justify-end">
                       {isSuccess && <button onClick={(e) => { e.stopPropagation(); onDownloadAlgorithm(run.id); }} className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-bold hover:bg-slate-50">算法文件</button>}
-                      {!isSuccess && !isRunning && !isTerminated && <button onClick={(e) => { e.stopPropagation(); onDownloadErrorLog(run.id); }} className="px-3 py-1.5 rounded-lg bg-rose-50 text-rose-600 text-xs font-bold">报错日志</button>}
-                      {isRunning && <button onClick={(e) => { e.stopPropagation(); onViewProgress(run); }} className="px-3 py-1.5 rounded-lg bg-indigo-500 text-white text-xs font-bold">查看进度</button>}
+                      {!isSuccess && !isRunning && !isTerminated && !isQueued && <button onClick={(e) => { e.stopPropagation(); onDownloadErrorLog(run.id); }} className="px-3 py-1.5 rounded-lg bg-rose-50 text-rose-600 text-xs font-bold">报错日志</button>}
+                      {isRunning && <button onClick={(e) => { e.stopPropagation(); onViewProgress(run); }} className="px-3 py-1.5 rounded-lg bg-indigo-500 text-white text-xs font-bold flex items-center gap-1.5"><i className="fa-solid fa-chart-line"></i>进度详情</button>}
+                      {isQueued && <button disabled type="button" className="px-3 py-1.5 rounded-lg bg-yellow-50 text-yellow-600 text-xs font-bold border border-yellow-200 cursor-default min-w-[4.5rem]">排队中</button>}
                       {isTerminated && <button disabled type="button" className="px-3 py-1.5 rounded-lg bg-amber-50 text-amber-600 text-xs font-bold border border-amber-200 cursor-default min-w-[4.5rem]">已终止</button>}
-                      <button onClick={(e) => { e.stopPropagation(); setStepsDetailRecord(run); }} className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-bold hover:bg-slate-50">节点</button>
+                      {!isRunning && !isQueued && <button onClick={(e) => { e.stopPropagation(); setStepsDetailRecord(run); }} className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-bold hover:bg-slate-50">节点</button>}
                     </div>
                     <i className={`fa-solid fa-chevron-down text-slate-400 transition-transform ${expanded ? 'rotate-180' : ''}`}></i>
                   </div>

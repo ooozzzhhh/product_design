@@ -82,6 +82,31 @@ const App: React.FC = () => {
           })
       : undefined;
 
+    // 根据并发模式决定新任务的状态
+    const concurrencyMode = func.concurrencyConfig?.mode;
+    const maxConcurrency = func.concurrencyConfig?.maxConcurrency || 1;
+    const runningTasks = runHistory.filter(r => r.functionId === func.id && r.status === 'running');
+
+    let initialStatus: 'running' | 'queued' = 'running';
+    let queuePosition: number | undefined;
+
+    if (concurrencyMode === 'EXCLUSIVE' || concurrencyMode === 'QUEUEABLE') {
+      // 不可并行或可排队模式：最多1个运行中
+      if (runningTasks.length >= 1) {
+        initialStatus = 'queued';
+        const queuedTasks = runHistory.filter(r => r.functionId === func.id && r.status === 'queued');
+        queuePosition = queuedTasks.length + 1;
+      }
+    } else if (concurrencyMode === 'LIMITED_PARALLEL') {
+      // 限N并发模式：最多N个运行中
+      if (runningTasks.length >= maxConcurrency) {
+        initialStatus = 'queued';
+        const queuedTasks = runHistory.filter(r => r.functionId === func.id && r.status === 'queued');
+        queuePosition = queuedTasks.length + 1;
+      }
+    }
+    // PARALLEL 模式：不限制，始终为 running
+
     const newRecord: RunRecord = {
       id: newRunId,
       moduleId: currentModuleId,
@@ -89,9 +114,9 @@ const App: React.FC = () => {
       startTime,
       operator: '管理员 (Admin)',
       algorithmScheme: currentModuleId === 'SCH' ? '规则式生产排程' : config.policyMode,
-      status: 'running',
+      status: initialStatus,
       progress: 0,
-      lastStep: steps[0]?.label ?? '初始化',
+      lastStep: initialStatus === 'queued' ? '等待中' : (steps[0]?.label ?? '初始化'),
       totalSteps: steps.length,
       runMode: config.runMode,
       policyMode: config.policyMode,
@@ -99,11 +124,26 @@ const App: React.FC = () => {
       planVersion: planVer,
       demandVersion: demandVer,
       inputInfo: inputInfoFromParams,
+      algorithmLogs: initialStatus === 'queued' ? [
+        `[${startTime.split(' ')[1]}] 任务已提交`,
+        `[${startTime.split(' ')[1]}] 检测到前序任务正在运行`,
+        `[${startTime.split(' ')[1]}] 当前排队中，等待资源释放...`,
+      ] : [
+        `[${startTime.split(' ')[1]}] ${steps[0]?.label ?? '初始化'}`,
+      ],
+      queueStatus: initialStatus === 'queued' && queuePosition !== undefined ? {
+        position: queuePosition,
+        estimatedWaitTime: `${queuePosition * 2}分钟`,
+      } : undefined,
     };
 
     setRunHistory((prev) => [newRecord, ...prev]);
     setViewingRun(null);
-    setIsProgressVisible(true);
+
+    // 只有运行中的任务才打开进度弹窗，排队任务不打开
+    if (initialStatus === 'running') {
+      setIsProgressVisible(true);
+    }
   };
 
   const handleDownloadAlgorithm = (runId: string) => {
