@@ -61,6 +61,9 @@
 
     /* 筛选栏 */
     .toolbar { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--radius); padding: 16px 20px; margin-bottom: 20px; display: flex; flex-wrap: wrap; align-items: center; gap: 16px; }
+    .header-with-toolbar { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; margin-bottom: 20px; flex-wrap: wrap; }
+    .header-with-toolbar .page-header { margin-bottom: 0; flex-shrink: 0; }
+    .header-with-toolbar .toolbar { margin-bottom: 0; flex: 1; min-width: 320px; justify-content: flex-end; }
     .toolbar label { font-weight: 500; color: var(--text-muted); font-size: 13px; }
     .toolbar select, .toolbar input { padding: 8px 14px; border: 1px solid var(--card-border); border-radius: var(--radius-sm); background: var(--page-bg); color: var(--text); font-family: inherit; font-size: 13px; min-width: 140px; }
     .toolbar select option, .toolbar input::placeholder { color: var(--text-muted); }
@@ -167,6 +170,17 @@
     .pagination-btns button:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); }
     .pagination-btns button:disabled { opacity: 0.4; cursor: not-allowed; }
     .pagination-btns button.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+    tr.selected td { background: var(--primary-light) !important; }
+
+    /* 重试状态弹窗 */
+    .retry-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 1100; display: flex; align-items: center; justify-content: center; opacity: 0; visibility: hidden; transition: var(--transition); }
+    .retry-modal.visible { opacity: 1; visibility: visible; }
+    .retry-modal-box { background: var(--card-bg); border-radius: var(--radius); padding: 32px 48px; text-align: center; box-shadow: 0 8px 32px rgba(0,0,0,0.2); min-width: 200px; }
+    .retry-spinner { width: 40px; height: 40px; border: 3px solid var(--card-border); border-top-color: var(--primary); border-radius: 50%; margin: 0 auto 16px; animation: spin 0.8s linear infinite; }
+    .retry-result { font-size: 16px; font-weight: 600; margin-top: 12px; }
+    .retry-result.success { color: var(--success); }
+    .retry-result.error { color: var(--error); }
+    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
@@ -203,14 +217,14 @@
           <div class="stat-sub" id="overview-inbound-sub">成功 0 次 · 失败 0 次</div>
         </div>
         <div class="stat-card clickable" data-nav="storage">
-          <div class="stat-label">中间表（今日）</div>
-          <div class="stat-value" id="overview-storage">0 <span class="stat-unit">行</span></div>
-          <div class="stat-sub success" id="overview-storage-sub">成功 0 行 · 失败 0 行</div>
+          <div class="stat-label">存储至中间表（今日）</div>
+          <div class="stat-value primary" id="overview-storage">0 <span class="stat-unit">次</span></div>
+          <div class="stat-sub" id="overview-storage-sub">全部成功 0 次 · 部分成功 0 次 · 失败 0 次</div>
         </div>
         <div class="stat-card clickable" data-nav="distribution">
-          <div class="stat-label">场景库分发（今日）</div>
-          <div class="stat-value" id="overview-dist">0 <span class="stat-unit">行</span></div>
-          <div class="stat-sub" id="overview-dist-sub">成功 0 行 · 失败 0 行</div>
+          <div class="stat-label">分发至场景库（今日）</div>
+          <div class="stat-value primary" id="overview-dist">0 <span class="stat-unit">次</span></div>
+          <div class="stat-sub" id="overview-dist-sub">全部成功 0 次 · 部分成功 0 次 · 失败 0 次</div>
         </div>
       </div>
       <div class="table-card">
@@ -226,7 +240,7 @@
                 <th>接口名称</th>
                 <th>批次号</th>
                 <th>状态</th>
-                <th>解析/应用</th>
+                <th>成功/失败</th>
                 <th>时间</th>
               </tr>
             </thead>
@@ -342,7 +356,7 @@
     <div id="view-storage" class="drill-view">
       <div class="page-header">
         <h1 class="page-title">中间表</h1>
-        <p class="page-desc">从外部系统获取数据时回传的原始数据凭证，全量接收无拒收</p>
+        <p class="page-desc">从外部系统获取数据时回传的原始数据凭证</p>
       </div>
       <div class="toolbar">
         <label>接口分类</label>
@@ -376,31 +390,29 @@
 
     <!-- 场景库分发 -->
     <div id="view-distribution" class="drill-view">
-      <div class="page-header">
-        <h1 class="page-title">场景库分发</h1>
-        <p class="page-desc">中间表数据分发至各场景库的统计与失败明细</p>
-      </div>
-      <div class="toolbar">
-        <label>接口分类</label>
-        <select id="dist-category"><option value="">全部</option><option value="物料">物料</option><option value="客户">客户</option></select>
-        <label>场景</label>
-        <select id="dist-scenario"><option value="">全部</option><option value="SCH">SCH</option><option value="MPS">MPS</option><option value="S&OP">S&OP</option></select>
-        <label>接口日志ID</label>
-        <input type="text" id="dist-apiLogId" placeholder="关联 apiLogId" style="min-width: 180px;" />
-        <label>是否有失败</label>
-        <select id="dist-hasFail"><option value="">全部</option><option value="1">有失败</option><option value="0">无失败</option></select>
-        <button class="btn btn-primary" id="btn-query-dist">查询</button>
-        <button class="btn btn-ghost" id="btn-reset-dist">重置</button>
-      </div>
-      <div class="stats-row">
-        <div class="stat-card"><div class="stat-label">总分发条数</div><div class="stat-value primary" id="dist-total">0 <span class="stat-unit">行</span></div></div>
-        <div class="stat-card"><div class="stat-label">成功</div><div class="stat-value success" id="dist-success">0 <span class="stat-unit">行</span></div></div>
-        <div class="stat-card"><div class="stat-label">失败/拒绝</div><div class="stat-value error" id="dist-fail">0 <span class="stat-unit">行</span></div></div>
-        <div class="stat-card-export" id="btn-export-distribution">
-          <span class="export-text">导出当前筛选条件下所有失败数据</span>
+      <div class="header-with-toolbar">
+        <div class="page-header">
+          <h1 class="page-title">场景库分发</h1>
+          <p class="page-desc">中间表数据分发至各场景库的统计与失败明细</p>
+        </div>
+        <div class="toolbar">
+          <label>接口分类</label>
+          <select id="dist-category"><option value="">全部</option><option value="物料">物料</option><option value="客户">客户</option></select>
+          <label>场景</label>
+          <select id="dist-scenario"><option value="">全部</option><option value="SCH">SCH</option><option value="MPS">MPS</option><option value="S&OP">S&OP</option></select>
+          <label>接口日志ID</label>
+          <input type="text" id="dist-apiLogId" placeholder="关联 apiLogId" style="min-width: 160px;" />
+          <label>是否有失败</label>
+          <select id="dist-hasFail"><option value="">全部</option><option value="1">有失败</option><option value="0">无失败</option></select>
+          <button class="btn btn-primary" id="btn-query-dist">查询</button>
+          <button class="btn btn-ghost" id="btn-reset-dist">重置</button>
         </div>
       </div>
       <div class="table-card">
+        <div style="padding: 16px 20px; border-bottom: 1px solid var(--card-border);">
+          <strong>汇总</strong>
+          <span style="margin-left: 12px; font-size: 12px; color: var(--text-muted);">点击行查看下方失败明细</span>
+        </div>
         <div class="table-wrap">
           <table>
             <thead>
@@ -422,6 +434,29 @@
         </div>
         <div class="pagination">
           <span class="pagination-info" id="dist-page-info">共 0 条</span>
+        </div>
+      </div>
+      <div class="table-card" style="margin-top: 20px;">
+        <div style="padding: 16px 20px; border-bottom: 1px solid var(--card-border);">
+          <strong>分发明细</strong>
+          <span id="dist-detail-hint" style="margin-left: 12px; font-size: 12px; color: var(--text-muted);">请在上方汇总中点击某一行</span>
+        </div>
+        <div class="table-wrap" style="max-height: 360px;">
+          <table>
+            <thead>
+              <tr>
+                <th>序号</th>
+                <th>数据ID</th>
+                <th>状态</th>
+                <th>错误类型</th>
+                <th>错误详情</th>
+              </tr>
+            </thead>
+            <tbody id="dist-detail-tbody"></tbody>
+          </table>
+        </div>
+        <div class="pagination">
+          <span class="pagination-info" id="dist-detail-page-info">共 0 条</span>
         </div>
       </div>
     </div>
@@ -492,6 +527,15 @@
         <button class="btn btn-ghost" style="margin-top: 12px;">跳转场景接口数据</button>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- 手工重试状态弹窗 -->
+<div id="retry-modal" class="retry-modal">
+  <div class="retry-modal-box">
+    <div id="retry-spinner" class="retry-spinner"></div>
+    <div id="retry-text">正在重试...</div>
+    <div id="retry-result" class="retry-result" style="display:none;"></div>
   </div>
 </div>
 
@@ -580,15 +624,49 @@
     return outboundLogs.filter(l => (categoryByApi[l.apiName] || '').toLowerCase().includes(kw)).map(l => l.id);
   }
 
-  // 模拟数据：场景库分发
+  // 模拟数据：存储至中间表（用于概览次数统计：全部成功/部分成功/失败）
+  const storageOps = [
+    { id: 'st-001', logId: 'log-001', total: 120, success: 120, fail: 0, createTime: '2025-03-02 14:32:18' },
+    { id: 'st-002', logId: 'log-001b', total: 80, success: 80, fail: 0, createTime: '2025-03-02 10:16:00' },
+    { id: 'st-003', logId: 'log-003b', total: 50, success: 45, fail: 5, createTime: '2025-03-02 09:30:00' },
+    { id: 'st-004', logId: 'log-003', total: 30, success: 0, fail: 30, createTime: '2025-03-02 14:15:22' }
+  ];
+
+  function storageOpStatus(r) {
+    if (r.fail === 0 && r.total > 0) return 'all_success';
+    if (r.success > 0 && r.fail > 0) return 'partial';
+    return 'fail';
+  }
+
+  function distRecordStatus(r) {
+    if (r.fail === 0) return 'all_success';
+    if (r.success > 0 && r.fail > 0) return 'partial';
+    return 'fail';
+  }
+
+  // 模拟数据：场景库分发（含成功与失败明细）
   const distRecords = [
-    { id: 'dist-001', logId: 'log-001', category: '物料', scenario: 'SCH', total: 118, success: 115, fail: 3, failSummary: '外键约束 2 条；唯一约束 1 条', createTime: '2025-03-02 14:32:25', errors: [
-      { dataId: 'ITF-PROD-015', type: '外键约束', detail: '库存点 ID 不存在于 mds_stock_point' },
-      { dataId: 'ITF-PROD-067', type: '外键约束', detail: '库存点 ID 不存在于 mds_stock_point' },
-      { dataId: 'ITF-PROD-099', type: '唯一约束', detail: 'Duplicate entry for product_code in sch_product' }
-    ]},
-    { id: 'dist-002', logId: 'log-002', category: '订单', scenario: 'MPS', total: 45, success: 45, fail: 0, failSummary: '—', createTime: '2025-03-02 14:28:10', errors: [] },
-    { id: 'dist-003', logId: 'log-001b', category: '物料', scenario: 'SCH', total: 100, success: 0, fail: 100, failSummary: '外键约束 50 条；唯一约束 50 条', createTime: '2025-03-02 10:17:00', errors: distErrors100 }
+    { id: 'dist-001', logId: 'log-001', category: '物料', scenario: 'SCH', total: 118, success: 115, fail: 3, failSummary: '外键约束 2 条；唯一约束 1 条', createTime: '2025-03-02 14:32:25',
+      successDetails: [
+        { dataId: 'ITF-PROD-001' }, { dataId: 'ITF-PROD-002' }, { dataId: 'ITF-PROD-003' }, { dataId: 'ITF-PROD-004' }, { dataId: 'ITF-PROD-005' },
+        { dataId: 'ITF-PROD-010' }, { dataId: 'ITF-PROD-020' }, { dataId: 'ITF-PROD-030' }, { dataId: 'ITF-PROD-040' }, { dataId: 'ITF-PROD-050' }
+      ],
+      errors: [
+        { dataId: 'ITF-PROD-015', type: '外键约束', detail: '库存点 ID 不存在于 mds_stock_point' },
+        { dataId: 'ITF-PROD-067', type: '外键约束', detail: '库存点 ID 不存在于 mds_stock_point' },
+        { dataId: 'ITF-PROD-099', type: '唯一约束', detail: 'Duplicate entry for product_code in sch_product' }
+      ]
+    },
+    { id: 'dist-002', logId: 'log-002', category: '订单', scenario: 'MPS', total: 45, success: 45, fail: 0, failSummary: '—', createTime: '2025-03-02 14:28:10',
+      successDetails: [
+        { dataId: 'ORD-001' }, { dataId: 'ORD-002' }, { dataId: 'ORD-003' }, { dataId: 'ORD-010' }, { dataId: 'ORD-020' }, { dataId: 'ORD-030' }
+      ],
+      errors: []
+    },
+    { id: 'dist-003', logId: 'log-001b', category: '物料', scenario: 'SCH', total: 100, success: 0, fail: 100, failSummary: '外键约束 50 条；唯一约束 50 条', createTime: '2025-03-02 10:17:00',
+      successDetails: [],
+      errors: distErrors100
+    }
   ];
 
   const logMock = {};
@@ -688,6 +766,40 @@
   function escapeHtml(s) { const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
   function manualRetry(logId) { alert('手动重试：' + logId + '\n（原型演示，实际将调用重试接口）'); }
 
+  function manualRetryDist(distId) {
+    const modal = document.getElementById('retry-modal');
+    const spinner = document.getElementById('retry-spinner');
+    const text = document.getElementById('retry-text');
+    const resultEl = document.getElementById('retry-result');
+    modal.classList.add('visible');
+    spinner.style.display = 'block';
+    text.textContent = '正在重试...';
+    text.style.display = 'block';
+    resultEl.style.display = 'none';
+    setTimeout(() => {
+      const isSuccess = Math.random() >= 0.5;
+      spinner.style.display = 'none';
+      text.style.display = 'none';
+      resultEl.style.display = 'block';
+      resultEl.className = 'retry-result ' + (isSuccess ? 'success' : 'error');
+      resultEl.textContent = isSuccess ? '重试成功' : '重试失败';
+      const r = distRecords.find(x => x.id === distId);
+      if (r && isSuccess) {
+        const formerErrors = r.errors || [];
+        r.fail = 0;
+        r.success = r.total;
+        r.failSummary = '—';
+        r.errors = [];
+        r.successDetails = [...(r.successDetails || []), ...formerErrors.map(e => ({ dataId: e.dataId }))];
+        r.createTime = new Date().toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }).replace(/\//g, '-');
+      }
+      filterDist();
+      updateOverview();
+      setTimeout(() => { modal.classList.remove('visible'); }, 1200);
+    }, 2000);
+  }
+
+  let selectedDistId = null;
   function filterDist() {
     const cat = document.getElementById('dist-category').value;
     const scenario = document.getElementById('dist-scenario').value;
@@ -701,41 +813,77 @@
       if (hasFail === '0' && r.fail > 0) return false;
       return true;
     });
-    const total = list.reduce((a,r) => a + r.total, 0);
-    const success = list.reduce((a,r) => a + r.success, 0);
-    const fail = list.reduce((a,r) => a + r.fail, 0);
-    document.getElementById('dist-total').innerHTML = total + ' <span class="stat-unit">行</span>';
-    document.getElementById('dist-success').innerHTML = success + ' <span class="stat-unit">行</span>';
-    document.getElementById('dist-fail').innerHTML = fail + ' <span class="stat-unit">行</span>';
+    if (selectedDistId && !list.find(r => r.id === selectedDistId)) selectedDistId = null;
     const tbody = document.getElementById('dist-tbody');
-    tbody.innerHTML = list.map((r, i) => `<tr class="clickable" data-dist-id="${r.id}">
+    tbody.innerHTML = list.map((r, i) => {
+      const retryBtn = r.fail > 0 ? `<button type="button" class="btn-link-sm" onclick="event.stopPropagation();manualRetryDist('${r.id}')">手工重试</button>` : '—';
+      const sel = r.id === selectedDistId ? ' selected' : '';
+      return `<tr class="clickable${sel}" data-dist-id="${r.id}">
       <td>${i+1}</td><td>${r.logId}</td><td>${r.category}</td><td>${r.scenario}</td><td>${r.total}</td>
       <td><span class="stat-value success">${r.success}</span></td><td><span class="stat-value ${r.fail?'error':'success'}">${r.fail}</span></td>
       <td>${r.failSummary}</td><td>${r.createTime}</td>
-      <td><button type="button" class="btn-link-sm" onclick="event.stopPropagation();openDistDetail('${r.id}')">明细</button></td>
-    </tr>`).join('');
+      <td>${retryBtn}</td>
+    </tr>`;
+    }).join('');
     document.getElementById('dist-page-info').textContent = '共 ' + list.length + ' 条';
+    renderDistDetail();
+  }
+
+  function selectDistRow(distId) {
+    selectedDistId = distId;
+    document.querySelectorAll('#dist-tbody tr').forEach(tr => {
+      tr.classList.toggle('selected', tr.dataset.distId === distId);
+    });
+    renderDistDetail();
+  }
+
+  function renderDistDetail() {
+    const hint = document.getElementById('dist-detail-hint');
+    const detailTbody = document.getElementById('dist-detail-tbody');
+    const pageInfo = document.getElementById('dist-detail-page-info');
+    const r = selectedDistId ? distRecords.find(x => x.id === selectedDistId) : null;
+    const successList = r ? (r.successDetails || []) : [];
+    const errs = r ? (r.errors || []) : [];
+    if (!r) {
+      hint.textContent = '请在上方汇总中点击某一行';
+      detailTbody.innerHTML = '';
+      pageInfo.textContent = '共 0 条';
+      return;
+    }
+    hint.textContent = r.logId + ' · ' + r.scenario + ' · 成功 ' + r.success + ' 条 · 失败 ' + r.fail + ' 条';
+    const rows = [
+      ...successList.map((s, i) => `<tr><td>${i+1}</td><td>${s.dataId}</td><td><span class="status-dot success"></span> 成功</td><td>—</td><td>—</td></tr>`),
+      ...errs.map((e, i) => `<tr><td>${successList.length + i + 1}</td><td>${e.dataId}</td><td><span class="status-dot error"></span> 失败</td><td><span class="err-msg">${e.type}</span></td><td>${escapeHtml(e.detail)}</td></tr>`)
+    ];
+    detailTbody.innerHTML = rows.length ? rows.join('') : '<tr><td colspan="5" style="color:var(--text-muted);text-align:center;">无明细数据</td></tr>';
+    pageInfo.textContent = '共 ' + rows.length + ' 条';
   }
 
   function updateOverview() {
     const oTotal = outboundLogs.length, oSuc = outboundLogs.filter(l=>l.status==='success').length, oFail = oTotal - oSuc;
     const iTotal = inboundLogs.length, iSuc = inboundLogs.filter(l=>l.status==='success').length, iFail = iTotal - iSuc;
-    const sTotal = Object.values(storageTableRows).reduce((a,rows)=>a+rows.length,0);
-    const dTotal = distRecords.reduce((a,r)=>a+r.total,0), dSuc = distRecords.reduce((a,r)=>a+r.success,0), dFail = distRecords.reduce((a,r)=>a+r.fail,0);
+    const sAll = storageOps.filter(r=>storageOpStatus(r)==='all_success').length;
+    const sPartial = storageOps.filter(r=>storageOpStatus(r)==='partial').length;
+    const sFail = storageOps.filter(r=>storageOpStatus(r)==='fail').length;
+    const sTotal = storageOps.length;
+    const dAll = distRecords.filter(r=>distRecordStatus(r)==='all_success').length;
+    const dPartial = distRecords.filter(r=>distRecordStatus(r)==='partial').length;
+    const dFail = distRecords.filter(r=>distRecordStatus(r)==='fail').length;
+    const dTotal = distRecords.length;
     document.getElementById('overview-outbound').innerHTML = oTotal + ' <span class="stat-unit">次</span>';
     document.getElementById('overview-outbound-sub').textContent = '成功 ' + oSuc + ' 次 · 失败 ' + oFail + ' 次';
     document.getElementById('overview-inbound').innerHTML = iTotal + ' <span class="stat-unit">次</span>';
     document.getElementById('overview-inbound-sub').textContent = '成功 ' + iSuc + ' 次 · 失败 ' + iFail + ' 次';
-    document.getElementById('overview-storage').innerHTML = sTotal + ' <span class="stat-unit">行</span>';
-    document.getElementById('overview-storage-sub').textContent = '今日接收凭证';
-    document.getElementById('overview-dist').innerHTML = dTotal + ' <span class="stat-unit">行</span>';
-    document.getElementById('overview-dist-sub').textContent = '成功 ' + dSuc + ' 行 · 失败 ' + dFail + ' 行';
-    const storageRecent = Object.entries(storageTableRows).filter(([,rows])=>rows.length).slice(0,2).map(([logId,rows])=>({ logId, rows: rows.length, createTime: rows[0]?.createTime, type:'storage', label:'中间表', apiName: logId + ' ' + rows.length + ' 行' }));
+    document.getElementById('overview-storage').innerHTML = sTotal + ' <span class="stat-unit">次</span>';
+    document.getElementById('overview-storage-sub').textContent = '全部成功 ' + sAll + ' 次 · 部分成功 ' + sPartial + ' 次 · 失败 ' + sFail + ' 次';
+    document.getElementById('overview-dist').innerHTML = dTotal + ' <span class="stat-unit">次</span>';
+    document.getElementById('overview-dist-sub').textContent = '全部成功 ' + dAll + ' 次 · 部分成功 ' + dPartial + ' 次 · 失败 ' + dFail + ' 次';
+    const storageRecent = storageOps.slice(0,2).map(s=>({ ...s, type:'storage', label:'存储', apiName: s.logId + ' 存储', batchNo: '—', createTime: s.createTime }));
     const recent = [
       ...outboundLogs.slice(0,2).map(l=>({...l, type:'outbound', label:'获取'})),
       ...inboundLogs.slice(0,2).map(l=>({...l, type:'inbound', label:'提供'})),
       ...storageRecent,
-      ...distRecords.slice(0,2).map(r=>({...r, type:'distribution', label:'分发', apiName: r.scenario + '场景库-' + r.category}))
+      ...distRecords.slice(0,2).map(r=>({...r, type:'distribution', label:'分发', apiName: r.scenario + '场景库-' + r.category, batchNo: r.logId}))
     ].sort((a,b)=>(parseDate(b.createTime||'')||0)-(parseDate(a.createTime||'')||0)).slice(0, 8);
     const tbody = document.getElementById('overview-tbody');
     tbody.innerHTML = recent.map(r => {
@@ -743,19 +891,27 @@
       if (r.type === 'outbound' || r.type === 'inbound') {
         attrs += ` data-log-id="${r.id}"`;
         status = r.status === 'success' ? '成功' : '失败';
-        parseApply = r.type === 'inbound' ? (r.deliverRows || 0) : (r.resolve + ' / ' + r.apply);
+        if (r.type === 'outbound') {
+          const suc = r.apply || 0, fail = (r.resolve || 0) - suc;
+          parseApply = suc + ' / ' + fail;
+        } else {
+          parseApply = (r.deliverRows || 0) + ' / 0';
+        }
       } else if (r.type === 'storage') {
         attrs += ` data-nav="storage"`;
-        status = r.rows + ' 行';
-        parseApply = '—';
+        const st = storageOpStatus(r);
+        status = st === 'all_success' ? '全部成功' : (st === 'partial' ? '部分成功' : '失败');
+        parseApply = (r.success || 0) + ' / ' + (r.fail || 0);
       } else {
         attrs += ` data-dist-id="${r.id}"`;
-        status = r.success + '/' + r.total;
-        parseApply = r.fail ? r.fail + ' 条失败' : '—';
+        const st = distRecordStatus(r);
+        status = st === 'all_success' ? '全部成功' : (st === 'partial' ? '部分成功' : '失败');
+        parseApply = (r.success || 0) + ' / ' + (r.fail || 0);
       }
+      const statusCls = status === '成功' || status === '全部成功' ? 'success' : (status === '部分成功' ? 'warn' : 'error');
       return `<tr class="clickable" ${attrs}>
-        <td><span class="status-dot ${r.fail>0?'warn':r.status||'success'}"></span> ${r.label}</td>
-        <td>${r.apiName}</td><td>${r.batchNo || '—'}</td><td>${status}</td><td>${parseApply}</td><td>${r.createTime || (r.rows && r.createTime) || '—'}</td>
+        <td><span class="status-dot ${statusCls}"></span> ${r.label}</td>
+        <td>${r.apiName}</td><td>${r.batchNo || '—'}</td><td>${status}</td><td>${parseApply}</td><td>${r.createTime || '—'}</td>
       </tr>`;
     }).join('');
     document.getElementById('overview-page-info').textContent = '共 ' + recent.length + ' 条';
@@ -946,11 +1102,14 @@
     filterDist();
   });
 
-  document.getElementById('btn-export-distribution').addEventListener('click', () => alert('导出当前筛选条件下所有失败数据（原型演示）'));
-
   document.addEventListener('click', function(e) {
     const tr = e.target.closest('tr.clickable');
     if (!tr) return;
+    const distTbody = document.getElementById('dist-tbody');
+    if (distTbody && distTbody.contains(tr)) {
+      selectDistRow(tr.dataset.distId);
+      return;
+    }
     const type = tr.dataset.type;
     const logId = tr.dataset.logId;
     const nav = tr.dataset.nav;
