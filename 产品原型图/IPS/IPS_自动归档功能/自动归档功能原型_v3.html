@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>归档管理原型 v3 - 数据库存储 · 手动触发</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Outfit:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --page-bg: #ffffff;
+            --card-bg: #ffffff;
+            --card-border: #e2e8f0;
+            --header-bg: #f8fafc;
+            --primary: #0ea5e9;
+            --primary-hover: #38bdf8;
+            --primary-light: rgba(14, 165, 233, 0.08);
+            --success: #22c55e;
+            --success-bg: rgba(34, 197, 94, 0.1);
+            --error: #ef4444;
+            --error-bg: rgba(239, 68, 68, 0.1);
+            --text: #1e293b;
+            --text-muted: #64748b;
+            --radius: 10px;
+            --radius-sm: 6px;
+            --shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+        }
+        html, body {
+            font-family: 'Outfit', 'Noto Sans SC', sans-serif;
+            background: #f4f6f8;
+            margin: 0;
+            padding: 0;
+            color: var(--text);
+            height: 100%;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: var(--page-bg);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 24px;
+            min-height: calc(100vh - 48px);
+            max-height: calc(100vh - 48px);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .flex-row { display: flex; gap: 15px; align-items: center; }
+        .flex-col { display: flex; flex-direction: column; gap: 10px; }
+        .flex-between { display: flex; justify-content: space-between; align-items: center; }
+        .hidden { display: none !important; }
+        .w-full { width: 100%; box-sizing: border-box; }
+        .mb-10 { margin-bottom: 10px; }
+        .mt-10 { margin-top: 10px; }
+
+        .btn {
+            padding: 8px 16px;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            border: none;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-hover); }
+        .btn-default { background: #fff; border: 1px solid var(--card-border); color: var(--text); }
+        .btn-default:hover { background: var(--primary-light); border-color: var(--primary); }
+        .btn-danger { background: var(--error); color: white; }
+        .btn-sm { padding: 4px 10px; font-size: 12px; }
+
+        .form-label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 600;
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+        .form-input, .form-select {
+            padding: 8px 14px;
+            border: 1px solid var(--card-border);
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+        }
+        .form-input:focus, .form-select:focus {
+            border-color: var(--primary);
+            outline: none;
+        }
+
+        .section-title {
+            font-size: 14px;
+            color: var(--primary);
+            font-weight: bold;
+            margin: 20px 0 15px 0;
+            padding-bottom: 8px;
+            border-bottom: 2px solid var(--primary);
+        }
+
+        .hint-text { font-size: 12px; color: var(--text-muted); margin-top: 5px; }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .modal {
+            background: white;
+            border-radius: var(--radius);
+            width: 90%;
+            max-width: 900px;
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .modal-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--card-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        .modal-scroll-body {
+            padding: 20px;
+            overflow-y: auto;
+            flex: 1;
+        }
+        .modal-footer {
+            padding: 16px 20px;
+            border-top: 1px solid var(--card-border);
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+        th, td { padding: 14px 20px; text-align: left; border-bottom: 1px solid var(--card-border); }
+        th { background: var(--header-bg); font-weight: 600; font-size: 13px; }
+        td { font-size: 13px; }
+        tr:hover { background: var(--primary-light); }
+
+        .badge { padding: 2px 8px; border-radius: 10px; font-size: 11px; }
+        .badge-green { background: var(--success-bg); color: var(--success); }
+        .badge-red { background: var(--error-bg); color: var(--error); }
+
+        .table-checkbox-list {
+            border: 1px solid var(--card-border);
+            border-radius: var(--radius-sm);
+            max-height: 280px;
+            overflow-y: auto;
+        }
+        .table-checkbox-item {
+            display: flex;
+            align-items: center;
+            padding: 10px 14px;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        .table-checkbox-item:last-child { border-bottom: none; }
+        .table-checkbox-item:hover { background: var(--primary-light); }
+        .table-checkbox-item input { margin-right: 10px; }
+
+        .config-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .config-label { font-size: 13px; color: var(--text-muted); min-width: 80px; }
+
+        .pagination-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 0;
+            border-top: 1px solid var(--card-border);
+        }
+        .pagination-btn {
+            padding: 6px 12px;
+            border: 1px solid var(--card-border);
+            background: white;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+        }
+        .pagination-btn:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); }
+        .pagination-btn:disabled { cursor: not-allowed; opacity: 0.5; }
+
+        .db-name-preview {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            padding: 8px 12px;
+            background: var(--header-bg);
+            border-radius: var(--radius-sm);
+            color: var(--primary);
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="flex-between" style="margin-bottom: 20px;">
+        <h2 style="margin: 0;">数据库归档管理</h2>
+        <button class="btn btn-primary" onclick="openEditModal()">+ 新建归档配置</button>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 22%;">配置名称</th>
+                <th style="width: 10%;">模块</th>
+                <th style="width: 12%;">归档表</th>
+                <th style="width: 28%;">归档规则</th>
+                <th style="width: 28%;">操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>SCH_Archive_Config</td>
+                <td>SCH</td>
+                <td>共 3 张</td>
+                <td>按时间：30 日之前</td>
+                <td>
+                    <button class="btn btn-primary btn-sm" onclick="triggerArchive(0)">触发归档</button>
+                    <button class="btn btn-default btn-sm" onclick="openEditModal()">编辑</button>
+                    <button class="btn btn-default btn-sm" onclick="openLogModal()">日志</button>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="pagination-container">
+        <div>共 1 条记录，第 1/1 页</div>
+        <div class="flex-row" style="gap: 10px;">
+            <button class="pagination-btn" disabled>上一页</button>
+            <button class="pagination-btn" disabled>下一页</button>
+        </div>
+    </div>
+</div>
+
+<!-- 新建/编辑配置弹窗 -->
+<div id="editModal" class="modal-overlay hidden">
+    <div class="modal">
+        <div class="modal-header">
+            <span>配置归档任务</span>
+            <span style="cursor:pointer; font-size: 20px;" onclick="closeEditModal()">✕</span>
+        </div>
+
+        <div class="modal-scroll-body">
+            <!-- 0. 配置任务名称 -->
+            <div class="section-title">0. 基础信息</div>
+            <div class="flex-row">
+                <div style="flex: 1;">
+                    <label class="form-label">配置任务名称 <span style="color: var(--error);">*</span></label>
+                    <input type="text" class="form-input w-full" id="configName" placeholder="如：SCH_Archive_Config" value="New_Archive_Config">
+                </div>
+            </div>
+
+            <!-- 1. 模块选择 -->
+            <div class="section-title">1. 选择模块</div>
+            <div class="flex-row">
+                <div style="flex: 1;">
+                    <label class="form-label">模块 <span style="color: var(--error);">*</span></label>
+                    <select class="form-select w-full" id="moduleSelect" onchange="onModuleChange()">
+                        <option value="">请选择模块</option>
+                        <option value="SCH">SCH - 生产排程</option>
+                        <option value="DFP">DFP - 需求计划</option>
+                        <option value="SOP">SOP - 产销协同</option>
+                        <option value="MPS">MPS - 主生产计划</option>
+                        <option value="MRP">MRP - 物料需求计划</option>
+                        <option value="MDS">MDS - 主数据</option>
+                    </select>
+                </div>
+                <div style="flex: 1;">
+                    <label class="form-label">目标数据库命名规则</label>
+                    <div class="db-name-preview" id="dbNamePreview">scp_{模块名}_{yyyymmddhhmmss}</div>
+                </div>
+            </div>
+
+            <!-- 2. 勾选要归档的表 -->
+            <div class="section-title">2. 勾选要归档的表</div>
+            <div class="mb-10">
+                <input type="text" class="form-input w-full" id="tableFilter" placeholder="输入表名关键字模糊筛选..." oninput="filterTableList()">
+            </div>
+            <div class="table-checkbox-list" id="tableCheckboxList">
+                <!-- 动态生成 -->
+            </div>
+            <div class="hint-text">请至少勾选一张表</div>
+
+            <!-- 3. 归档规则（仅按时间） -->
+            <div class="section-title">3. 归档规则（按时间条件）</div>
+            <div style="background: #f8fafc; padding: 15px; border-radius: var(--radius-sm);">
+                <div class="config-row">
+                    <span class="config-label">基准字段：</span>
+                    <input type="text" class="form-input" id="baseField" value="created_at" placeholder="如：created_at、update_time" style="width: 180px;">
+                </div>
+                <div class="config-row" style="margin-top: 12px;">
+                    <span class="config-label">归档范围：</span>
+                    <span>归档</span>
+                    <input type="number" class="form-input" id="timeValue" value="30" min="1" style="width: 70px; margin: 0 6px;">
+                    <select class="form-select" id="timeUnit" style="width: 90px;">
+                        <option value="day">日</option>
+                        <option value="month">月</option>
+                        <option value="year">年</option>
+                    </select>
+                    <span>之前的数据</span>
+                </div>
+                <div class="hint-text" style="margin-top: 8px;">(基于服务器时间)</div>
+            </div>
+        </div>
+
+        <div class="modal-footer">
+            <button class="btn btn-default" onclick="closeEditModal()">取消</button>
+            <button class="btn btn-primary" onclick="saveConfig()">保存配置</button>
+        </div>
+    </div>
+</div>
+
+<!-- 日志弹窗 -->
+<div id="logModal" class="modal-overlay hidden">
+    <div class="modal" style="max-width: 1000px;">
+        <div class="modal-header">
+            <span>手工触发归档日志</span>
+            <span style="cursor:pointer; font-size: 20px;" onclick="closeLogModal()">✕</span>
+        </div>
+        <div class="modal-scroll-body">
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 14%;">触发ID</th>
+                        <th style="width: 22%;">目标数据库名</th>
+                        <th style="width: 12%;">归档范围</th>
+                        <th style="width: 18%;">触发时间</th>
+                        <th style="width: 10%;">状态</th>
+                        <th style="width: 24%;">备注</th>
+                    </tr>
+                </thead>
+                <tbody id="logTableBody">
+                    <tr>
+                        <td><code>ARCH-20260317-001</code></td>
+                        <td><code>scp_sch_202603171424</code></td>
+                        <td>3 张表</td>
+                        <td>2026-03-17 14:24:35</td>
+                        <td><span class="badge badge-green">成功</span></td>
+                        <td>-</td>
+                    </tr>
+                    <tr>
+                        <td><code>ARCH-20260316-002</code></td>
+                        <td><code>scp_sch_202603160830</code></td>
+                        <td>3 张表</td>
+                        <td>2026-03-16 08:30:12</td>
+                        <td><span class="badge badge-green">成功</span></td>
+                        <td>-</td>
+                    </tr>
+                    <tr>
+                        <td><code>ARCH-20260315-003</code></td>
+                        <td><code>scp_sch_202603151020</code></td>
+                        <td>3 张表</td>
+                        <td>2026-03-15 10:20:08</td>
+                        <td><span class="badge badge-red">失败</span></td>
+                        <td>数据库连接超时</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-default" onclick="closeLogModal()">关闭</button>
+            <button class="btn btn-default">导出日志</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ==================== 模块与表数据 ====================
+const moduleTables = {
+    SCH: ['sch_run_header', 'sch_run_detail', 'sch_task_log', 'sch_schedule_result', 'sch_resource_log'],
+    DFP: ['dfp_demand_header', 'dfp_demand_detail', 'dfp_version_log'],
+    SOP: ['sop_plan_header', 'sop_plan_detail', 'sop_snapshot_log'],
+    MPS: ['mps_order', 'mps_order_item', 'mps_run_log'],
+    MRP: ['mrp_run_header', 'mrp_run_detail', 'mrp_run_log'],
+    MDS: ['mds_demand_header', 'mds_demand_detail', 'mds_version_log']
+};
+
+let currentConfig = {
+    name: '',
+    module: '',
+    tables: [],
+    baseField: 'created_at',
+    timeValue: 30,
+    timeUnit: 'day'
+};
+
+// ==================== 模态框 ====================
+function openEditModal() {
+    document.getElementById('editModal').classList.remove('hidden');
+    const filterEl = document.getElementById('tableFilter');
+    if (filterEl) filterEl.value = '';
+    renderTableCheckboxes();
+    updateDbNamePreview();
+}
+
+function closeEditModal() {
+    document.getElementById('editModal').classList.add('hidden');
+}
+
+function openLogModal() {
+    document.getElementById('logModal').classList.remove('hidden');
+}
+
+function closeLogModal() {
+    document.getElementById('logModal').classList.add('hidden');
+}
+
+// ==================== 模块与表 ====================
+function onModuleChange() {
+    const module = document.getElementById('moduleSelect').value;
+    currentConfig.module = module;
+    renderTableCheckboxes();
+    updateDbNamePreview();
+}
+
+function renderTableCheckboxes() {
+    const module = document.getElementById('moduleSelect').value;
+    const container = document.getElementById('tableCheckboxList');
+
+    if (!module) {
+        container.innerHTML = '<div style="padding: 20px; color: var(--text-muted);">请先选择模块</div>';
+        return;
+    }
+
+    const tables = moduleTables[module] || [];
+    const checkedTables = currentConfig.tables;
+
+    container.innerHTML = tables.map(table => `
+        <label class="table-checkbox-item" data-table="${table}">
+            <input type="checkbox" value="${table}" ${checkedTables.includes(table) ? 'checked' : ''} onchange="toggleTable('${table}')">
+            <span>${table}</span>
+        </label>
+    `).join('');
+    filterTableList();
+}
+
+function filterTableList() {
+    const keyword = (document.getElementById('tableFilter')?.value || '').trim().toLowerCase();
+    const items = document.querySelectorAll('#tableCheckboxList .table-checkbox-item');
+    items.forEach(item => {
+        const tableName = (item.getAttribute('data-table') || '').toLowerCase();
+        item.style.display = keyword === '' || tableName.includes(keyword) ? '' : 'none';
+    });
+}
+
+function toggleTable(tableName) {
+    const checkbox = document.querySelector(`#tableCheckboxList input[value="${tableName}"]`);
+    if (checkbox && checkbox.checked) {
+        if (!currentConfig.tables.includes(tableName)) currentConfig.tables.push(tableName);
+    } else {
+        currentConfig.tables = currentConfig.tables.filter(t => t !== tableName);
+    }
+}
+
+function updateDbNamePreview() {
+    const module = document.getElementById('moduleSelect').value;
+    const preview = document.getElementById('dbNamePreview');
+    preview.textContent = module ? `scp_${module.toLowerCase()}_{yyyymmddhhmmss}` : 'scp_{模块名}_{yyyymmddhhmmss}';
+}
+
+// ==================== 保存 ====================
+function saveConfig() {
+    const taskName = document.getElementById('configName').value.trim() || 'New_Archive_Config';
+    const module = document.getElementById('moduleSelect').value;
+    const baseField = document.getElementById('baseField').value;
+    const timeValue = document.getElementById('timeValue').value;
+    const timeUnit = document.getElementById('timeUnit').value;
+
+    if (!module) {
+        alert('请选择模块');
+        return;
+    }
+
+    const checkboxes = document.querySelectorAll('#tableCheckboxList input:checked');
+    const tables = Array.from(checkboxes).map(cb => cb.value);
+
+    if (tables.length === 0) {
+        alert('请至少勾选一张要归档的表');
+        return;
+    }
+
+    currentConfig = {
+        name: taskName,
+        module,
+        tables,
+        baseField: baseField || 'created_at',
+        timeValue: parseInt(timeValue) || 30,
+        timeUnit
+    };
+
+    alert('保存成功！\n模块：' + module + '\n归档表：' + tables.length + ' 张');
+    closeEditModal();
+}
+
+// ==================== 触发归档 ====================
+function triggerArchive(index) {
+    const module = 'SCH';
+    const now = new Date();
+    const ts = now.getFullYear() + 
+        String(now.getMonth()+1).padStart(2,'0') + 
+        String(now.getDate()).padStart(2,'0') + 
+        String(now.getHours()).padStart(2,'0') + 
+        String(now.getMinutes()).padStart(2,'0') + 
+        String(now.getSeconds()).padStart(2,'0');
+    const dbName = `scp_${module.toLowerCase()}_${ts}`;
+    const triggerId = `ARCH-${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}-${String(Math.floor(Math.random()*100)).padStart(3,'0')}`;
+
+    alert('已触发归档！\n\n触发ID：' + triggerId + '\n目标数据库：' + dbName + '\n归档范围：3 张表');
+}
+</script>
+</body>
+</html>
