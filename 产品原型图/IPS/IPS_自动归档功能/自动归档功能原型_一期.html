@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>归档管理原型 · 一期（场景库 + 归档对象 + 双层确认）</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Outfit:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --page-bg: #ffffff;
+            --card-bg: #ffffff;
+            --card-border: #e2e8f0;
+            --header-bg: #f8fafc;
+            --primary: #0ea5e9;
+            --primary-hover: #38bdf8;
+            --primary-light: rgba(14, 165, 233, 0.08);
+            --success: #22c55e;
+            --success-bg: rgba(34, 197, 94, 0.1);
+            --warning: #f59e0b;
+            --warning-bg: rgba(245, 158, 11, 0.12);
+            --error: #ef4444;
+            --error-bg: rgba(239, 68, 68, 0.1);
+            --muted: #64748b;
+            --text: #1e293b;
+            --text-muted: #64748b;
+            --radius: 10px;
+            --radius-sm: 6px;
+            --shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+        }
+        html, body {
+            font-family: 'Outfit', 'Noto Sans SC', sans-serif;
+            background: #f1f5f9;
+            margin: 0;
+            padding: 0;
+            color: var(--text);
+            min-height: 100%;
+        }
+        .container {
+            max-width: 1440px;
+            margin: 24px auto;
+            background: var(--page-bg);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 24px 28px 28px;
+        }
+
+        .flex-row { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+        .flex-between { display: flex; justify-content: space-between; align-items: center; }
+        .hidden { display: none !important; }
+        .w-full { width: 100%; box-sizing: border-box; }
+        .mb-10 { margin-bottom: 10px; }
+        .mt-6 { margin-top: 6px; }
+
+        .btn {
+            padding: 8px 16px;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            border: none;
+            font-size: 14px;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-hover); }
+        .btn-primary:disabled { opacity: 0.55; cursor: not-allowed; }
+        .btn-default { background: #fff; border: 1px solid var(--card-border); color: var(--text); }
+        .btn-default:hover { background: var(--primary-light); border-color: var(--primary); }
+        .btn-sm { padding: 4px 10px; font-size: 12px; }
+
+        .form-label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 600;
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+        .form-input, .form-select {
+            padding: 8px 14px;
+            border: 1px solid var(--card-border);
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+            font-family: inherit;
+        }
+        .form-input:focus, .form-select:focus {
+            border-color: var(--primary);
+            outline: none;
+        }
+
+        .section-title {
+            font-size: 14px;
+            color: var(--primary);
+            font-weight: 700;
+            margin: 22px 0 12px 0;
+            padding-bottom: 8px;
+            border-bottom: 2px solid var(--primary);
+        }
+
+        .hint-text { font-size: 12px; color: var(--text-muted); margin-top: 6px; line-height: 1.5; }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(15, 23, 42, 0.45);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 16px;
+        }
+        .modal {
+            background: white;
+            border-radius: var(--radius);
+            width: 100%;
+            max-width: 920px;
+            max-height: 92vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.2);
+        }
+        .modal.modal-narrow { max-width: 560px; }
+        .modal-header {
+            padding: 16px 22px;
+            border-bottom: 1px solid var(--card-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 16px;
+            font-weight: 700;
+        }
+        .modal-scroll-body { padding: 20px 22px; overflow-y: auto; flex: 1; }
+        .modal-footer {
+            padding: 14px 22px;
+            border-top: 1px solid var(--card-border);
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .config-table { width: 100%; border-collapse: collapse; }
+        .config-table th, .config-table td {
+            padding: 12px 14px;
+            text-align: left;
+            border-bottom: 1px solid var(--card-border);
+            font-size: 13px;
+            vertical-align: top;
+        }
+        .config-table th { background: var(--header-bg); font-weight: 600; color: var(--text-muted); }
+
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+        .badge-ok { background: var(--success-bg); color: var(--success); }
+        .badge-run { background: var(--warning-bg); color: #b45309; }
+        .badge-err { background: var(--error-bg); color: var(--error); }
+        .badge-neu { background: #f1f5f9; color: var(--muted); }
+
+        .log-main-row { cursor: pointer; }
+        .log-main-row:hover { background: var(--primary-light); }
+        .log-data-table {
+            border-collapse: collapse;
+            table-layout: fixed;
+            width: 100%;
+        }
+        .log-data-table th, .log-data-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--card-border);
+            font-size: 13px;
+            line-height: 1.45;
+            vertical-align: middle;
+            text-align: left;
+            box-sizing: border-box;
+        }
+        .log-data-table thead th {
+            background: var(--header-bg);
+            font-weight: 600;
+            color: var(--text-muted);
+            white-space: nowrap;
+        }
+        .log-data-table .log-col-expand {
+            width: 36px;
+            max-width: 36px;
+            padding-left: 10px;
+            padding-right: 6px;
+            text-align: center;
+        }
+        .log-data-table .log-col-expand .chev { margin: 0 auto; }
+        .log-op-inner {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            min-height: 30px;
+        }
+        .log-op-placeholder { color: var(--text-muted); font-size: 13px; }
+
+        .log-detail-row td { background: #f8fafc; padding: 0 !important; border-bottom: 1px solid var(--card-border); vertical-align: top; }
+        .log-detail-inner { padding: 16px 16px 18px 16px; }
+
+        .detail-panel {
+            margin: 0 0 2px 0;
+            border-radius: var(--radius-sm);
+            border: 1px solid #e2e8f0;
+            background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+            overflow: hidden;
+        }
+        .detail-panel-header {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: baseline;
+            gap: 8px 14px;
+            padding: 12px 14px;
+            background: rgba(14, 165, 233, 0.06);
+            border-bottom: 1px solid #e0f2fe;
+        }
+        .detail-panel-header strong { font-size: 13px; color: #0c4a6e; }
+        .detail-panel-caption { font-size: 12px; color: var(--text-muted); }
+
+        .detail-tiles {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 10px;
+            padding: 12px 14px 14px;
+        }
+        .detail-tile {
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 10px 12px;
+            box-shadow: 0 1px 0 rgba(255,255,255,0.8) inset;
+        }
+        .detail-tbl-name {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            color: #0f172a;
+            background: #f1f5f9;
+            padding: 4px 8px;
+            border-radius: 4px;
+            display: inline-block;
+            max-width: 100%;
+            word-break: break-all;
+        }
+        .detail-tile-metrics {
+            display: flex;
+            gap: 12px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+        .metric {
+            flex: 1;
+            min-width: 100px;
+            padding: 8px 10px;
+            border-radius: 6px;
+            background: #f8fafc;
+            border: 1px solid #f1f5f9;
+        }
+        .metric-label { display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 2px; }
+        .metric-value { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; color: #0f172a; letter-spacing: -0.02em; }
+        .metric-accent .metric-value { color: #0369a1; }
+
+        .mini-table { width: 100%; border-collapse: collapse; font-size: 12px; max-width: 720px; }
+        .mini-table th, .mini-table td { padding: 8px 10px; border: 1px solid #e2e8f0; text-align: left; }
+        .mini-table th { background: #fff; color: var(--text-muted); font-weight: 600; }
+
+        .status-group { display: flex; flex-direction: column; gap: 4px; font-size: 11px; line-height: 1.35; }
+        .status-line { color: var(--text-muted); }
+        .status-line strong { color: var(--text); font-weight: 600; }
+
+        .pagination-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 0 0;
+            border-top: 1px solid var(--card-border);
+            margin-top: 8px;
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+        .pagination-btn {
+            padding: 6px 12px;
+            border: 1px solid var(--card-border);
+            background: white;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-family: inherit;
+        }
+        .pagination-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .db-name-preview {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            padding: 10px 12px;
+            background: var(--header-bg);
+            border-radius: var(--radius-sm);
+            color: #0369a1;
+            word-break: break-all;
+            line-height: 1.45;
+        }
+
+        .intro-block {
+            background: linear-gradient(135deg, #f8fafc 0%, #f0f9ff 100%);
+            border: 1px solid #e0f2fe;
+            border-radius: var(--radius-sm);
+            padding: 14px 16px;
+            margin-bottom: 14px;
+            font-size: 13px;
+            line-height: 1.65;
+            color: #334155;
+        }
+        .intro-block h4 { margin: 0 0 8px 0; font-size: 13px; color: #0c4a6e; }
+        .risk-list { margin: 0; padding-left: 18px; color: #475569; }
+
+        .spinner-wrap {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 36px 20px;
+            gap: 14px;
+            color: var(--text-muted);
+            font-size: 13px;
+        }
+        .spinner {
+            width: 36px;
+            height: 36px;
+            border: 3px solid #e2e8f0;
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 0.75s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .chev { display: inline-block; transition: transform 0.2s; color: var(--muted); font-size: 10px; width: 18px; }
+        .chev.open { transform: rotate(90deg); }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="flex-between" style="margin-bottom: 20px;">
+        <div>
+            <h2 style="margin: 0 0 6px 0;">数据库归档管理</h2>
+        </div>
+        <button type="button" class="btn btn-primary" onclick="openEditModal()">+ 新建归档配置</button>
+    </div>
+
+    <table class="config-table">
+        <thead>
+            <tr>
+                <th style="width: 18%;">配置名称</th>
+                <th style="width: 8%;">模块</th>
+                <th style="width: 14%;">场景（源库）</th>
+                <th style="width: 14%;">业务对象</th>
+                <th style="width: 22%;">归档规则</th>
+                <th style="width: 26%;">操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>SCH_CO_Archive</td>
+                <td>SCH</td>
+                <td><code style="font-size:16px;">scp_sch</code></td>
+                <td>客户订单<div class="hint-text" style="margin:0;">系统关联 3 张表</div></td>
+                <td>按时间：30 日之前</td>
+                <td>
+                    <button type="button" class="btn btn-primary btn-sm" onclick="startTriggerFlow()">触发归档</button>
+                    <button type="button" class="btn btn-default btn-sm" onclick="openEditModal()">编辑</button>
+                    <button type="button" class="btn btn-default btn-sm" onclick="openLogModal()">日志</button>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="pagination-container">
+        <div>共 1 条记录，第 1/1 页</div>
+        <div class="flex-row" style="gap: 10px; align-items: center;">
+            <button type="button" class="pagination-btn" disabled>上一页</button>
+            <button type="button" class="pagination-btn" disabled>下一页</button>
+        </div>
+    </div>
+</div>
+
+<!-- 新建/编辑配置弹窗 -->
+<div id="editModal" class="modal-overlay hidden">
+    <div class="modal">
+        <div class="modal-header">
+            <span>配置归档任务</span>
+            <span style="cursor:pointer; font-size: 20px; line-height: 1;" onclick="closeEditModal()" role="button" aria-label="关闭">✕</span>
+        </div>
+
+        <div class="modal-scroll-body">
+            <div class="section-title">0. 基础信息</div>
+            <div class="flex-row">
+                <div style="flex: 1; min-width: 240px;">
+                    <label class="form-label">配置任务名称 <span style="color: var(--error);">*</span></label>
+                    <input type="text" class="form-input w-full" id="configName" placeholder="如：SCH_CO_Archive" value="New_Archive_Config">
+                </div>
+            </div>
+
+            <div class="section-title">1. 选择模块与场景</div>
+            <div class="flex-row">
+                <div style="flex: 1; min-width: 200px;">
+                    <label class="form-label">模块 <span style="color: var(--error);">*</span></label>
+                    <select class="form-select w-full" id="moduleSelect" onchange="onModuleOrSceneChange()">
+                        <option value="">请选择模块</option>
+                        <option value="SCH">SCH - 生产排程</option>
+                        <option value="DFP">DFP - 需求计划</option>
+                        <option value="SOP">SOP - 产销协同</option>
+                        <option value="MPS">MPS - 主生产计划</option>
+                        <option value="MRP">MRP - 物料需求计划</option>
+                        <option value="MDS">MDS - 主数据</option>
+                    </select>
+                </div>
+                <div style="flex: 1; min-width: 220px;">
+                    <label class="form-label">归档场景（具体源库）<span style="color: var(--error);">*</span></label>
+                    <select class="form-select w-full" id="sceneSelect" onchange="onModuleOrSceneChange()" disabled>
+                        <option value="">请先选择模块</option>
+                    </select>
+                </div>
+            </div>
+            <div class="flex-row" style="margin-top: 12px;">
+                <div style="flex: 1;">
+                    <label class="form-label">目标归档库命名规则</label>
+                    <div class="db-name-preview" id="dbNamePreview">请先选择场景</div>
+                </div>
+            </div>
+
+            <div class="section-title">2. 选择归档对象（业务对象）</div>
+            <div class="flex-row">
+                <div style="flex: 1; min-width: 280px;">
+                    <label class="form-label">业务对象 <span style="color: var(--error);">*</span></label>
+                    <select class="form-select w-full" id="bizObjectSelect">
+                        <option value="CUSTOMER_ORDER">客户订单</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="section-title">3. 归档规则（按时间条件）</div>
+            <div style="background: #f8fafc; padding: 15px; border-radius: var(--radius-sm); border: 1px solid var(--card-border);">
+                <div class="flex-row" style="align-items: center;">
+                    <span style="font-size:13px;color:var(--text-muted);min-width:72px;">基准字段</span>
+                    <input type="text" class="form-input" id="baseField" value="created_at" placeholder="如：created_at" style="width: 200px;">
+                </div>
+                <div class="flex-row" style="margin-top: 12px; align-items: center;">
+                    <span style="font-size:13px;color:var(--text-muted);min-width:72px;">归档范围</span>
+                    <span style="font-size:13px;">归档</span>
+                    <input type="number" class="form-input" id="timeValue" value="30" min="1" style="width: 72px;">
+                    <select class="form-select" id="timeUnit" style="width: 88px;">
+                        <option value="day">日</option>
+                        <option value="month">月</option>
+                        <option value="year">年</option>
+                    </select>
+                    <span style="font-size:13px;">之前的数据（基于服务器时间）</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal-footer">
+            <button type="button" class="btn btn-default" onclick="closeEditModal()">取消</button>
+            <button type="button" class="btn btn-primary" onclick="saveConfig()">保存配置</button>
+        </div>
+    </div>
+</div>
+
+<!-- 第一层：概念 / 流程 / 风险 -->
+<div id="introModal" class="modal-overlay hidden">
+    <div class="modal modal-narrow">
+        <div class="modal-header">
+            <span>触发归档前说明</span>
+            <span style="cursor:pointer; font-size: 20px;" onclick="closeIntroModal()" role="button" aria-label="关闭">✕</span>
+        </div>
+        <div class="modal-scroll-body">
+            <div class="intro-block">
+                <h4>归档是什么</h4>
+                <p style="margin:0;">将符合时间规则的在线业务数据<strong>复制到独立归档库</strong>，用于释放在线库空间、保留审计与历史查询能力。归档与日常「备份」不同，面向<strong>按业务规则搬迁历史明细</strong>。</p>
+            </div>
+            <div class="intro-block">
+                <h4>归档流程（概要）</h4>
+                <p style="margin:0;">1）创建目标归档库（命名含场景库名与时间戳）→ 2）按表迁移符合条件的数据 → 3）校验目标数据 → 4）按策略处理源表数据（如删除已归档行）。任务状态与源/目标处理状态在日志中分别展示。</p>
+            </div>
+            <div class="intro-block" style="border-color: #fecaca; background: linear-gradient(135deg, #fffbeb 0%, #fef2f2 100%);">
+                <h4 style="color:#991b1b;">风险与注意</h4>
+                <ul class="risk-list">
+                    <li>时间范围配置错误可能导致<strong>误归档近期订单</strong>，请与业务确认窗口。</li>
+                    <li>大表归档占用 IO 与磁盘，建议在<strong>业务低峰</strong>执行。</li>
+                    <li>源数据删除前可通过日志中的状态判断；<strong>未删除</strong>前支持撤回任务。</li>
+                </ul>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-default" onclick="closeIntroModal()">取消</button>
+            <button type="button" class="btn btn-primary" onclick="introConfirm()">已了解，继续</button>
+        </div>
+    </div>
+</div>
+
+<!-- 第二层：实时汇总 + 加载 -->
+<div id="summaryModal" class="modal-overlay hidden">
+    <div class="modal">
+        <div class="modal-header">
+            <span>确认本次归档范围</span>
+            <span style="cursor:pointer; font-size: 20px;" onclick="closeSummaryModal()" role="button" aria-label="关闭">✕</span>
+        </div>
+        <div class="modal-scroll-body">
+            <p class="hint-text" style="margin-top:0;">以下数据由服务端按当前配置实时统计，数据量大时可能需等待数秒。</p>
+            <div id="summaryLoading" class="spinner-wrap">
+                <div class="spinner" aria-hidden="true"></div>
+                <span>正在查询各表行数，请稍候…</span>
+            </div>
+            <div id="summaryContent" class="hidden">
+                <div style="font-size:13px;margin-bottom:12px;"><strong>业务对象：</strong>客户订单 &nbsp;·&nbsp; <strong>系统关联表数：</strong><span id="sumTableCount">0</span> <span class="hint-text" style="margin:0;display:inline;">（由服务端按对象解析）</span></div>
+                <table class="mini-table">
+                    <thead>
+                        <tr>
+                            <th>物理表名</th>
+                            <th style="width:100px;">原行数</th>
+                            <th style="width:100px;">拟归档行数</th>
+                        </tr>
+                    </thead>
+                    <tbody id="summaryTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-default" onclick="closeSummaryModal()">取消</button>
+            <button type="button" class="btn btn-primary" id="summaryOkBtn" disabled onclick="summaryConfirmTrigger()">确定触发归档</button>
+        </div>
+    </div>
+</div>
+
+<!-- 日志弹窗 -->
+<div id="logModal" class="modal-overlay hidden">
+    <div class="modal" style="max-width: 1100px;">
+        <div class="modal-header">
+            <span>手工触发归档日志</span>
+            <span style="cursor:pointer; font-size: 20px;" onclick="closeLogModal()" role="button" aria-label="关闭">✕</span>
+        </div>
+        <div class="modal-scroll-body" style="padding-top:12px;">
+            <table class="log-data-table">
+                <colgroup>
+                    <col class="log-col-expand" style="width:36px">
+                    <col style="width:11%">
+                    <col style="width:20%">
+                    <col style="width:12%">
+                    <col style="width:10%">
+                    <col style="width:10%">
+                    <col style="width:10%">
+                    <col style="width:12%">
+                    <col style="width:15%">
+                </colgroup>
+                <thead>
+                    <tr>
+                        <th class="log-col-expand" scope="col"></th>
+                        <th scope="col">触发ID</th>
+                        <th scope="col">目标归档库</th>
+                        <th scope="col">对象 / 表数</th>
+                        <th scope="col">任务流程</th>
+                        <th scope="col">目标数据</th>
+                        <th scope="col">源数据</th>
+                        <th scope="col">触发时间</th>
+                        <th scope="col">操作</th>
+                    </tr>
+                </thead>
+                <tbody id="logTableBody"></tbody>
+            </table>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-default" onclick="closeLogModal()">关闭</button>
+        </div>
+    </div>
+</div>
+
+<script>
+/** 模块 → 场景（具体库） */
+const moduleScenes = {
+    SCH: [
+        { id: 'sch_prod', label: '生产源库', dbName: 'scp_sch' },
+        { id: 'sch_dr', label: '灾备只读库', dbName: 'scp_sch_dr' }
+    ],
+    DFP: [{ id: 'dfp_prod', label: '生产源库', dbName: 'scp_dfp' }],
+    SOP: [{ id: 'sop_prod', label: '生产源库', dbName: 'scp_sop' }],
+    MPS: [{ id: 'mps_prod', label: '生产源库', dbName: 'scp_mps' }],
+    MRP: [{ id: 'mrp_prod', label: '生产源库', dbName: 'scp_mrp' }],
+    MDS: [{ id: 'mds_prod', label: '生产源库', dbName: 'scp_mds' }]
+};
+
+/** 演示：客户订单对象系统关联表数量（实际由后端按模块/环境解析） */
+const DEMO_CO_TABLE_COUNT = 3;
+
+let currentConfig = {
+    name: '',
+    module: '',
+    sceneDb: '',
+    sceneLabel: '',
+    bizObjectId: 'CUSTOMER_ORDER',
+    baseField: 'created_at',
+    timeValue: 30,
+    timeUnit: 'day'
+};
+
+let expandedLogId = null;
+
+/** 演示用日志数据 */
+let logEntries = [
+    {
+        id: 'e1',
+        triggerId: 'ARCH-20260320-001',
+        targetDb: 'scp_sch_archeive_20260320101530',
+        objectName: '客户订单',
+        tableCount: 3,
+        taskFlow: '成功',
+        targetStatus: '建档成功',
+        sourceStatus: '已删除',
+        time: '2026-03-20 10:18:22',
+        remark: '-',
+        tables: [
+            { name: 'sch_customer_order_hdr', orig: 128400, archived: 18200 },
+            { name: 'sch_customer_order_line', orig: 502100, archived: 71200 },
+            { name: 'sch_co_change_log', orig: 89000, archived: 12000 }
+        ]
+    },
+    {
+        id: 'e2',
+        triggerId: 'ARCH-20260319-002',
+        targetDb: 'scp_sch_archeive_20260319194500',
+        objectName: '客户订单',
+        tableCount: 3,
+        taskFlow: '进行中',
+        targetStatus: '建档成功',
+        sourceStatus: '未删除',
+        time: '2026-03-19 19:45:08',
+        remark: '迁移完成，待源清理',
+        tables: [
+            { name: 'sch_customer_order_hdr', orig: 128400, archived: 9100 },
+            { name: 'sch_customer_order_line', orig: 502100, archived: 35600 },
+            { name: 'sch_co_change_log', orig: 89000, archived: 6000 }
+        ]
+    },
+    {
+        id: 'e3',
+        triggerId: 'ARCH-20260318-003',
+        targetDb: 'scp_sch_archeive_20260318110200',
+        objectName: '客户订单',
+        tableCount: 3,
+        taskFlow: '失败',
+        targetStatus: '建档失败',
+        sourceStatus: '未删除',
+        time: '2026-03-18 11:02:41',
+        remark: '[IPS001] 创建归档库失败，请检查实例权限与磁盘空间。',
+        tables: [
+            { name: 'sch_customer_order_hdr', orig: 128400, archived: 0 },
+            { name: 'sch_customer_order_line', orig: 502100, archived: 0 },
+            { name: 'sch_co_change_log', orig: 89000, archived: 0 }
+        ]
+    }
+];
+
+function badgeClass(kind) {
+    if (kind === '成功' || kind === '建档成功' || kind === '已删除') return 'badge-ok';
+    if (kind === '进行中' || kind === '未删除') return 'badge-neu';
+    return 'badge-err';
+}
+
+function buildDetailTiles(entry) {
+    return entry.tables.map(t => `
+        <div class="detail-tile">
+            <div><span class="detail-tbl-name">${t.name}</span></div>
+            <div class="detail-tile-metrics">
+                <div class="metric">
+                    <span class="metric-label">原行数</span>
+                    <span class="metric-value">${t.orig.toLocaleString()}</span>
+                </div>
+                <div class="metric metric-accent">
+                    <span class="metric-label">被归档行数</span>
+                    <span class="metric-value">${t.archived.toLocaleString()}</span>
+                </div>
+            </div>
+        </div>`).join('');
+}
+
+function renderLogTable() {
+    const body = document.getElementById('logTableBody');
+    body.innerHTML = '';
+
+    logEntries.forEach(entry => {
+        const open = expandedLogId === entry.id;
+        const tr = document.createElement('tr');
+        tr.className = 'log-main-row';
+        tr.innerHTML = `
+            <td class="log-col-expand" onclick="event.stopPropagation();toggleLog('${entry.id}')"><span class="chev ${open ? 'open' : ''}">▶</span></td>
+            <td onclick="toggleLog('${entry.id}')"><code style="font-size:11px;">${entry.triggerId}</code></td>
+            <td onclick="toggleLog('${entry.id}')"><code style="font-size:11px;word-break:break-all;">${entry.targetDb}</code></td>
+            <td onclick="toggleLog('${entry.id}')">${entry.objectName}<div class="hint-text" style="margin:0;">${entry.tableCount} 张表</div></td>
+            <td onclick="toggleLog('${entry.id}')"><span class="badge ${badgeClass(entry.taskFlow)}">${entry.taskFlow}</span></td>
+            <td onclick="toggleLog('${entry.id}')"><span class="badge ${badgeClass(entry.targetStatus)}">${entry.targetStatus}</span></td>
+            <td onclick="toggleLog('${entry.id}')"><span class="badge ${badgeClass(entry.sourceStatus)}">${entry.sourceStatus}</span></td>
+            <td onclick="toggleLog('${entry.id}')">${entry.time}</td>
+            <td onclick="event.stopPropagation();">
+                <div class="log-op-inner">
+                    ${entry.sourceStatus === '未删除'
+                        ? `<button type="button" class="btn btn-default btn-sm" onclick="revokeTask('${entry.id}')">撤回</button>`
+                        : '<span class="log-op-placeholder">—</span>'}
+                </div>
+            </td>
+        `;
+        body.appendChild(tr);
+
+        if (open) {
+            const detailTr = document.createElement('tr');
+            detailTr.className = 'log-detail-row';
+            detailTr.innerHTML = `
+                <td class="log-col-expand"></td>
+                <td colspan="8">
+                    <div class="log-detail-inner">
+                        <div class="detail-panel">
+                            <div class="detail-panel-header">
+                                <strong>处理详情</strong>
+                            </div>
+                            <div class="detail-tiles">${buildDetailTiles(entry)}</div>
+                        </div>
+                        ${entry.remark && entry.remark !== '-' ? `<p class="hint-text" style="margin:10px 2px 0 2px;"><strong>备注：</strong>${entry.remark}</p>` : ''}
+                    </div>
+                </td>
+            `;
+            body.appendChild(detailTr);
+        }
+    });
+}
+
+function toggleLog(id) {
+    expandedLogId = expandedLogId === id ? null : id;
+    renderLogTable();
+}
+
+function revokeTask(id) {
+    const e = logEntries.find(x => x.id === id);
+    if (!e) return;
+    if (!confirm('确定撤回该归档任务？撤回后系统将中止对源数据的后续处理（具体以后端状态机为准）。')) return;
+    e.taskFlow = '失败';
+    e.remark = '用户已撤回';
+    e.sourceStatus = '未删除';
+    renderLogTable();
+}
+
+function openEditModal() {
+    document.getElementById('editModal').classList.remove('hidden');
+    const bo = document.getElementById('bizObjectSelect');
+    if (bo && currentConfig.bizObjectId) bo.value = currentConfig.bizObjectId;
+    fillSceneSelect();
+    updateDbNamePreview();
+}
+
+function closeEditModal() {
+    document.getElementById('editModal').classList.add('hidden');
+}
+
+function openLogModal() {
+    document.getElementById('logModal').classList.remove('hidden');
+    renderLogTable();
+}
+
+function closeLogModal() {
+    document.getElementById('logModal').classList.add('hidden');
+}
+
+function fillSceneSelect() {
+    const mod = document.getElementById('moduleSelect').value;
+    const sel = document.getElementById('sceneSelect');
+    sel.innerHTML = '';
+    if (!mod) {
+        sel.disabled = true;
+        sel.innerHTML = '<option value="">请先选择模块</option>';
+        return;
+    }
+    sel.disabled = false;
+    const scenes = moduleScenes[mod] || [];
+    scenes.forEach((s, i) => {
+        const opt = document.createElement('option');
+        opt.value = s.dbName;
+        opt.dataset.label = s.label;
+        opt.textContent = `${s.label}（${s.dbName}）`;
+        if (i === 0) opt.selected = true;
+        sel.appendChild(opt);
+    });
+}
+
+function onModuleOrSceneChange() {
+    updateDbNamePreview();
+}
+
+function getSelectedSceneDb() {
+    const sel = document.getElementById('sceneSelect');
+    if (sel.disabled || !sel.value) return '';
+    return sel.value;
+}
+
+function updateDbNamePreview() {
+    const db = getSelectedSceneDb();
+    const el = document.getElementById('dbNamePreview');
+    el.textContent = db
+        ? `${db}_archeive_{yyyymmddhhmmss}`
+        : '请先选择场景（源库）';
+}
+
+function saveConfig() {
+    const taskName = document.getElementById('configName').value.trim() || 'New_Archive_Config';
+    const module = document.getElementById('moduleSelect').value;
+    const sceneDb = getSelectedSceneDb();
+    const sel = document.getElementById('sceneSelect');
+    const opt = sel.options[sel.selectedIndex];
+    const sceneLabel = opt ? opt.dataset.label || '' : '';
+
+    if (!module) { alert('请选择模块'); return; }
+    if (!sceneDb) { alert('请选择归档场景（具体源库）'); return; }
+
+    const bizObjectId = document.getElementById('bizObjectSelect')?.value || '';
+    if (!bizObjectId) {
+        alert('请选择业务对象');
+        return;
+    }
+
+    currentConfig.name = taskName;
+    currentConfig.module = module;
+    currentConfig.sceneDb = sceneDb;
+    currentConfig.sceneLabel = sceneLabel;
+    currentConfig.bizObjectId = bizObjectId;
+    currentConfig.baseField = document.getElementById('baseField').value || 'created_at';
+    currentConfig.timeValue = parseInt(document.getElementById('timeValue').value, 10) || 30;
+    currentConfig.timeUnit = document.getElementById('timeUnit').value;
+
+    alert('保存成功！\n模块：' + module + '\n场景库：' + sceneDb + '\n业务对象：客户订单（系统将自动关联物理表，演示为 ' + DEMO_CO_TABLE_COUNT + ' 张）');
+    closeEditModal();
+}
+
+/* ========== 触发归档：双层弹窗 ========== */
+function closeIntroModal() {
+    document.getElementById('introModal').classList.add('hidden');
+}
+
+function closeSummaryModal() {
+    document.getElementById('summaryModal').classList.add('hidden');
+    document.getElementById('summaryOkBtn').disabled = true;
+}
+
+function startTriggerFlow() {
+    document.getElementById('introModal').classList.remove('hidden');
+}
+
+function introConfirm() {
+    closeIntroModal();
+    document.getElementById('summaryModal').classList.remove('hidden');
+    document.getElementById('summaryLoading').classList.remove('hidden');
+    document.getElementById('summaryContent').classList.add('hidden');
+    document.getElementById('summaryOkBtn').disabled = true;
+
+    /** 模拟接口延迟 */
+    setTimeout(() => {
+        const demoTables = [
+            { name: 'sch_customer_order_hdr', orig: 128400, archived: 18200 },
+            { name: 'sch_customer_order_line', orig: 502100, archived: 71200 },
+            { name: 'sch_co_change_log', orig: 89000, archived: 12000 }
+        ];
+        document.getElementById('summaryLoading').classList.add('hidden');
+        document.getElementById('summaryContent').classList.remove('hidden');
+        document.getElementById('sumTableCount').textContent = String(demoTables.length);
+        const tb = document.getElementById('summaryTableBody');
+        tb.innerHTML = demoTables.map(t =>
+            `<tr><td><code>${t.name}</code></td><td>${t.orig.toLocaleString()}</td><td>${t.archived.toLocaleString()}</td></tr>`
+        ).join('');
+        document.getElementById('summaryOkBtn').disabled = false;
+    }, 2200);
+}
+
+function summaryConfirmTrigger() {
+    const now = new Date();
+    const ts = now.getFullYear() +
+        String(now.getMonth() + 1).padStart(2, '0') +
+        String(now.getDate()).padStart(2, '0') +
+        String(now.getHours()).padStart(2, '0') +
+        String(now.getMinutes()).padStart(2, '0') +
+        String(now.getSeconds()).padStart(2, '0');
+    const dbName = `scp_sch_archeive_${ts}`;
+    const triggerId = `ARCH-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${String(Math.floor(Math.random() * 900) + 100)}`;
+
+    const newEntry = {
+        id: 'e' + Date.now(),
+        triggerId,
+        targetDb: dbName,
+        objectName: '客户订单',
+        tableCount: 3,
+        taskFlow: '进行中',
+        targetStatus: '建档成功',
+        sourceStatus: '未删除',
+        time: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ` +
+            `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`,
+        remark: '任务已提交',
+        tables: [
+            { name: 'sch_customer_order_hdr', orig: 128400, archived: 18200 },
+            { name: 'sch_customer_order_line', orig: 502100, archived: 71200 },
+            { name: 'sch_co_change_log', orig: 89000, archived: 12000 }
+        ]
+    };
+    logEntries.unshift(newEntry);
+    expandedLogId = null;
+    closeSummaryModal();
+    if (!document.getElementById('logModal').classList.contains('hidden')) {
+        renderLogTable();
+    }
+    alert('已正式触发归档任务\n\n触发ID：' + triggerId + '\n目标归档库：' + dbName + '\n\n可在该配置的「日志」弹窗中查看记录。');
+}
+
+document.getElementById('moduleSelect')?.addEventListener('change', () => {
+    fillSceneSelect();
+    updateDbNamePreview();
+});
+
+document.getElementById('sceneSelect')?.addEventListener('change', () => {
+    updateDbNamePreview();
+});
+
+renderLogTable();
+</script>
+</body>
+</html>
