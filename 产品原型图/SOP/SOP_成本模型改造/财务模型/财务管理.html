@@ -1229,11 +1229,10 @@
                                         <th style="width: 120px;">物品代码</th>
                                         <th style="width: 100px;">库存点</th>
                                         <th style="width: 100px;">版本</th>
-                                        <th style="width: 100px;">时段</th>
-                                        <th style="width: 160px;">单位最大库存违反成本</th>
-                                        <th style="width: 120px;">库存持有成本</th>
-                                        <th style="width: 140px;">资金占用成本率（年化）</th>
-                                        <th style="width: 100px;">库存成本合计</th>
+                                        <th style="width: 130px;">时段</th>
+                                        <th style="width: 130px;">仓储成本率（年化）</th>
+                                        <th style="width: 130px;">资金成本率（年化）</th>
+                                        <th style="width: 120px;">库存成本合计（率）</th>
                                         <th style="width: 80px;">货币</th>
                                         <th style="width: 120px;">备注</th>
                                         <th style="width: 80px;">创建人</th>
@@ -1472,14 +1471,15 @@
                     <div class="cost-field-group" data-cost-type="inventory">
                         <div class="grid grid-cols-2 gap-4">
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">单位最大库存违反成本 (MAXIMUM_VIOLATION_UNIT_COST)</label>
-                                <input type="number" id="editMaximumViolationUnitCost" name="maximum_violation_unit_cost" step="0.01" min="0" class="w-full input" placeholder="超限单件成本">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">仓储成本率（年化）</label>
+                                <input type="number" id="editWarehouseStorageCostRate" name="warehouse_storage_cost_rate" step="0.01" min="0" max="100" class="w-full input" placeholder="如 3 表示 3%">
                             </div>
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">库存持有成本 (HOLDING_TIME_COST)</label>
-                                <input type="number" id="editHoldingTimeCost" name="holding_time_cost" step="0.01" min="0" class="w-full input" placeholder="按天/小时计费">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">资金成本率（年化）</label>
+                                <input type="number" id="editCapitalRate" name="capital_rate" step="0.01" min="0" max="100" class="w-full input" placeholder="如 5 表示 5%">
                             </div>
                         </div>
+                        <p class="text-xs text-gray-500 mt-2">列表中「库存成本合计（率）」= 仓储成本率 + 资金成本率，仅展示、不可编辑。</p>
                     </div>
                     
                     <!-- 违约罚金相关字段（挂靠对象：客户） -->
@@ -1490,11 +1490,11 @@
                                 <input type="text" id="editPenaltyCustomerId" name="penalty_customer_id" readonly class="w-full input bg-gray-50 cursor-not-allowed">
                             </div>
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">单位晚交罚金 (LATE_DELIVERY_UNIT_COST)</label>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">单位晚交罚金</label>
                                 <input type="number" id="editLateDeliveryUnitCost" name="late_delivery_unit_cost" step="0.01" min="0" class="w-full input" placeholder="延期交付单件违约金">
                             </div>
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">单位欠交罚金 (NON_DELIVERY_UNIT_COST)</label>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">单位欠交罚金</label>
                                 <input type="number" id="editNonDeliveryUnitCost" name="non_delivery_unit_cost" step="0.01" min="0" class="w-full input" placeholder="未交付单件赔偿金">
                             </div>
                         </div>
@@ -2308,8 +2308,7 @@
                             product_id: product,
                             start_time: period.start,
                             end_time: period.end,
-                            maximum_violation_unit_cost: round2(50 + Math.random() * 30),
-                            holding_time_cost: round2(5 + Math.random() * 5),
+                            warehouse_storage_cost_rate: round2(2 + Math.random() * 3),
                             capital_rate: round2(8 + Math.random() * 4),
                             currency_unit_id: 'CNY',
                             remark: `库存-${product}-${stockPoint}-${version}`,
@@ -3469,7 +3468,7 @@
                                 ? 'purchase_cost'
                                 : currentTab === 'transport'
                                     ? 'transport_cost'
-                                    : 'maximum_violation_unit_cost';
+                                    : 'warehouse_storage_cost_rate';
                         const avgVal = groupAvg(group.items, costField);
                         const avgDisplay = avgVal != null ? formatNumber(avgVal) : '-';
                         let avgRow = `
@@ -3493,10 +3492,10 @@
                             const avgTotal = group.items.reduce((sum, item) => sum + ((item.transport_cost || 0) + (item.fixed_transport_cost || 0)), 0) / group.items.length;
                             avgRow += `<td></td><td></td><td><span class="cost-badge transport">${avgDisplay}</span></td><td><span class="cost-badge transport">${avgFixed != null ? formatNumber(avgFixed) : '-'}</span></td><td><span class="cost-badge transport">${formatNumber(avgTotal)}</span></td><td></td>`;
                         } else if (currentTab === 'inventory') {
-                            const avgHold = groupAvg(group.items, 'holding_time_cost');
+                            const avgWh = groupAvg(group.items, 'warehouse_storage_cost_rate');
                             const avgCapital = groupAvg(group.items, 'capital_rate');
-                            const avgTotal = group.items.reduce((sum, item) => sum + ((item.maximum_violation_unit_cost || 0) + (item.holding_time_cost || 0)), 0) / group.items.length;
-                            avgRow += `<td><span class="cost-badge inventory">${avgDisplay}</span></td><td><span class="cost-badge inventory">${avgHold != null ? formatNumber(avgHold) : '-'}</span></td><td><span class="cost-badge inventory">${avgCapital != null ? formatNumber(avgCapital) : '-'}%</span></td><td><span class="cost-badge inventory">${formatNumber(avgTotal)}</span></td>`;
+                            const avgTotalRate = group.items.reduce((sum, item) => sum + ((item.warehouse_storage_cost_rate || 0) + (item.capital_rate || 0)), 0) / group.items.length;
+                            avgRow += `<td><span class="cost-badge inventory">${avgWh != null ? formatNumber(avgWh) + '%' : '-'}</span></td><td><span class="cost-badge inventory">${avgCapital != null ? formatNumber(avgCapital) + '%' : '-'}</span></td><td><span class="cost-badge inventory">${formatNumber(avgTotalRate)}%</span></td>`;
                         }
                         avgRow += `<td></td><td></td><td></td><td></td><td></td><td></td></tr>`;
                         html += avgRow;
@@ -3519,7 +3518,7 @@
                                 <td class="text-xs">${formatPeriod(item.start_time, item.end_time)}</td>
                         `;
 
-                        const cellKey = `${item.id}_${currentTab === 'production' ? 'production_cost' : currentTab === 'purchase' ? 'purchase_cost' : currentTab === 'transport' ? 'transport_cost' : currentTab === 'inventory' ? 'maximum_violation_unit_cost' : 'late_delivery_unit_cost'}`;
+                        const cellKey = `${item.id}_${currentTab === 'production' ? 'production_cost' : currentTab === 'purchase' ? 'purchase_cost' : currentTab === 'transport' ? 'transport_cost' : currentTab === 'inventory' ? 'warehouse_storage_cost_rate' : 'late_delivery_unit_cost'}`;
                         const isModified = modifiedCells.has(cellKey);
                         const modifiedClass = isModified ? 'modified' : '';
                         
@@ -3576,22 +3575,20 @@
                                 </td>
                             `;
                         } else if (currentTab === 'inventory') {
-                            const violValue = formatNumber(item.maximum_violation_unit_cost);
-                            const holdValue = formatNumber(item.holding_time_cost);
-                            const capitalValue = formatNumber(item.capital_rate);
-                            const totalCost = (item.maximum_violation_unit_cost || 0) + (item.holding_time_cost || 0);
+                            const whStr = formatNumber(item.warehouse_storage_cost_rate);
+                            const capStr = formatNumber(item.capital_rate);
+                            const whDisplay = whStr === '-' ? '-' : whStr + '%';
+                            const capDisplay = capStr === '-' ? '-' : capStr + '%';
+                            const totalRate = (item.warehouse_storage_cost_rate || 0) + (item.capital_rate || 0);
                             rowHtml += `
-                                <td class="editable-cell ${modifiedClass}" data-row-id="${item.id}" data-field="maximum_violation_unit_cost" data-original="${item.maximum_violation_unit_cost || ''}">
-                                    <span class="cost-badge inventory">${violValue}</span>
+                                <td class="editable-cell ${modifiedClass}" data-row-id="${item.id}" data-field="warehouse_storage_cost_rate" data-original="${item.warehouse_storage_cost_rate ?? ''}">
+                                    <span class="cost-badge inventory">${whDisplay}</span>
                                 </td>
-                                <td class="editable-cell" data-row-id="${item.id}" data-field="holding_time_cost" data-original="${item.holding_time_cost || ''}">
-                                    <span class="cost-badge inventory">${holdValue}</span>
-                                </td>
-                                <td class="editable-cell" data-row-id="${item.id}" data-field="capital_rate" data-original="${item.capital_rate || ''}">
-                                    <span class="cost-badge inventory">${capitalValue}%</span>
+                                <td class="editable-cell" data-row-id="${item.id}" data-field="capital_rate" data-original="${item.capital_rate ?? ''}">
+                                    <span class="cost-badge inventory">${capDisplay}</span>
                                 </td>
                                 <td>
-                                    <span class="cost-badge inventory">${formatNumber(totalCost)}</span>
+                                    <span class="cost-badge inventory">${formatNumber(totalRate)}%</span>
                                 </td>
                             `;
                         } else if (currentTab === 'penalty') {
@@ -3745,10 +3742,17 @@
             const rowId = cell.getAttribute('data-row-id');
             const field = cell.getAttribute('data-field');
             const originalValue = cell.getAttribute('data-original') || '';
-            const currentValue = getCellValue(cell);
+            const rateFields = ['warehouse_storage_cost_rate', 'capital_rate'];
+            let seed = '';
+            if (rateFields.includes(field)) {
+                seed = (originalValue || '').trim();
+            } else {
+                const currentValue = getCellValue(cell);
+                seed = currentValue === '-' ? '' : String(currentValue).replace(/%/g, '').trim();
+            }
 
             cell.classList.add('editing');
-            cell.innerHTML = `<input type="number" step="0.01" min="0" value="${currentValue === '-' ? '' : currentValue}" class="cell-input">`;
+            cell.innerHTML = `<input type="number" step="0.01" min="0" value="${seed}" class="cell-input">`;
             
             const input = cell.querySelector('.cell-input');
             input.focus();
@@ -3782,7 +3786,10 @@
             const originalValue = cell.getAttribute('data-original') || '';
             
             const numValue = newValue === '' ? null : round2(parseFloat(newValue));
-            const displayValue = numValue === null ? '-' : formatNumber(numValue);
+            let displayValue = numValue === null ? '-' : formatNumber(numValue);
+            if (field === 'warehouse_storage_cost_rate' || field === 'capital_rate') {
+                displayValue = numValue === null ? '-' : formatNumber(numValue) + '%';
+            }
             
             // 更新数据
             const item = getCostItemById(rowId);
@@ -3813,7 +3820,7 @@
             const badgeClass = field === 'production_cost' || field === 'fixed_production_cost' ? 'production' : 
                               field === 'purchase_cost' || field === 'fixed_purchase_cost' ? 'purchase' : 
                               field === 'transport_cost' || field === 'fixed_transport_cost' ? 'transport' : 
-                              field === 'maximum_violation_unit_cost' || field === 'holding_time_cost' ? 'inventory' : 
+                              field === 'warehouse_storage_cost_rate' || field === 'capital_rate' ? 'inventory' : 
                               field === 'late_delivery_unit_cost' || field === 'non_delivery_unit_cost' ? 'penalty' : 'production';
             const isModified = modifiedCells.has(`${rowId}_${field}`);
             cell.classList.remove('editing');
@@ -3833,12 +3840,19 @@
             const rowId = cell.getAttribute('data-row-id');
             const field = cell.getAttribute('data-field');
             const originalValue = cell.getAttribute('data-original') || '';
-            const displayValue = originalValue === '' || originalValue === null ? '-' : formatNumber(parseFloat(originalValue));
+            let displayValue;
+            if (originalValue === '' || originalValue === null) {
+                displayValue = '-';
+            } else if (field === 'warehouse_storage_cost_rate' || field === 'capital_rate') {
+                displayValue = formatNumber(parseFloat(originalValue)) + '%';
+            } else {
+                displayValue = formatNumber(parseFloat(originalValue));
+            }
             
             const badgeClass = field === 'production_cost' || field === 'fixed_production_cost' ? 'production' : 
                               field === 'purchase_cost' || field === 'fixed_purchase_cost' ? 'purchase' : 
                               field === 'transport_cost' || field === 'fixed_transport_cost' ? 'transport' : 
-                              field === 'maximum_violation_unit_cost' || field === 'holding_time_cost' ? 'inventory' : 
+                              field === 'warehouse_storage_cost_rate' || field === 'capital_rate' ? 'inventory' : 
                               field === 'late_delivery_unit_cost' || field === 'non_delivery_unit_cost' ? 'penalty' : 'production';
             cell.classList.remove('editing');
             cell.innerHTML = `<span class="cost-badge ${badgeClass}">${displayValue}</span>`;
@@ -4298,8 +4312,8 @@
                     document.getElementById('editTransportCost').value = item.transport_cost || '';
                     document.getElementById('editFixedTransportCost').value = item.fixed_transport_cost ?? '';
                 } else if (currentTab === 'inventory') {
-                    document.getElementById('editMaximumViolationUnitCost').value = item.maximum_violation_unit_cost ?? '';
-                    document.getElementById('editHoldingTimeCost').value = item.holding_time_cost ?? '';
+                    document.getElementById('editWarehouseStorageCostRate').value = item.warehouse_storage_cost_rate ?? '';
+                    document.getElementById('editCapitalRate').value = item.capital_rate ?? '';
                 } else if (currentTab === 'penalty') {
                     document.getElementById('editLateDeliveryUnitCost').value = item.late_delivery_unit_cost ?? '';
                     document.getElementById('editNonDeliveryUnitCost').value = item.non_delivery_unit_cost ?? '';
@@ -4350,8 +4364,8 @@
                 data.purchase_cost = null;
                 data.fixed_purchase_cost = null;
             } else if (currentTab === 'inventory') {
-                data.maximum_violation_unit_cost = data.maximum_violation_unit_cost ? round2(parseFloat(data.maximum_violation_unit_cost)) : null;
-                data.holding_time_cost = data.holding_time_cost ? round2(parseFloat(data.holding_time_cost)) : null;
+                data.warehouse_storage_cost_rate = data.warehouse_storage_cost_rate ? round2(parseFloat(data.warehouse_storage_cost_rate)) : null;
+                data.capital_rate = data.capital_rate ? round2(parseFloat(data.capital_rate)) : null;
             } else if (currentTab === 'penalty') {
                 data.customer_id = document.getElementById('editPenaltyCustomerId').value?.trim() || null;
                 data.late_delivery_unit_cost = data.late_delivery_unit_cost ? round2(parseFloat(data.late_delivery_unit_cost)) : null;
@@ -4866,10 +4880,10 @@
                                     <div class="flex items-center gap-3 p-3 bg-gray-50 rounded">
                                         <div class="flex-1">
                                             <div class="text-sm text-gray-600 mb-1">时段: ${formatPeriod(item.start_time, item.end_time)}</div>
-                                            <div class="text-xs text-gray-500">单位最大库存违反成本: ${formatNumber(item.maximum_violation_unit_cost)} | 库存持有成本: ${formatNumber(item.holding_time_cost)}</div>
+                                            <div class="text-xs text-gray-500">仓储成本率: ${formatNumber(item.warehouse_storage_cost_rate)}% | 资金成本率: ${formatNumber(item.capital_rate)}% | 合计（率）: ${formatNumber((item.warehouse_storage_cost_rate || 0) + (item.capital_rate || 0))}%</div>
                                         </div>
-                                        <div class="w-32"><input type="number" step="0.01" min="0" placeholder="违反成本" class="w-full input text-sm batch-cost-input" data-item-id="${item.id}" data-field="maximum_violation_unit_cost"></div>
-                                        <div class="w-32"><input type="number" step="0.01" min="0" placeholder="持有成本" class="w-full input text-sm batch-cost-input" data-item-id="${item.id}" data-field="holding_time_cost"></div>
+                                        <div class="w-28"><input type="number" step="0.01" min="0" max="100" placeholder="仓储%" class="w-full input text-sm batch-cost-input" data-item-id="${item.id}" data-field="warehouse_storage_cost_rate"></div>
+                                        <div class="w-28"><input type="number" step="0.01" min="0" max="100" placeholder="资金%" class="w-full input text-sm batch-cost-input" data-item-id="${item.id}" data-field="capital_rate"></div>
                                     </div>
                                 `).join('')}
                             </div>
@@ -6698,8 +6712,8 @@
                             <option value="fixed_production_cost" ${rule.field === 'fixed_production_cost' ? 'selected' : ''}>固定生产成本</option>
                             <option value="fixed_purchase_cost" ${rule.field === 'fixed_purchase_cost' ? 'selected' : ''}>固定采购成本</option>
                             <option value="fixed_transport_cost" ${rule.field === 'fixed_transport_cost' ? 'selected' : ''}>固定运输成本</option>
-                            <option value="maximum_violation_unit_cost" ${rule.field === 'maximum_violation_unit_cost' ? 'selected' : ''}>单位最大库存违反成本</option>
-                            <option value="holding_time_cost" ${rule.field === 'holding_time_cost' ? 'selected' : ''}>库存持有成本</option>
+                            <option value="warehouse_storage_cost_rate" ${rule.field === 'warehouse_storage_cost_rate' ? 'selected' : ''}>仓储成本率（年化）</option>
+                            <option value="capital_rate" ${rule.field === 'capital_rate' ? 'selected' : ''}>资金成本率（年化）</option>
                             <option value="late_delivery_unit_cost" ${rule.field === 'late_delivery_unit_cost' ? 'selected' : ''}>单位晚交罚金</option>
                             <option value="non_delivery_unit_cost" ${rule.field === 'non_delivery_unit_cost' ? 'selected' : ''}>单位欠交罚金</option>
                         </select>
@@ -6747,8 +6761,8 @@
                 'fixed_production_cost': '固定生产成本',
                 'fixed_purchase_cost': '固定采购成本',
                 'fixed_transport_cost': '固定运输成本',
-                'maximum_violation_unit_cost': '单位最大库存违反成本',
-                'holding_time_cost': '库存持有成本',
+                'warehouse_storage_cost_rate': '仓储成本率（年化）',
+                'capital_rate': '资金成本率（年化）',
                 'late_delivery_unit_cost': '单位晚交罚金',
                 'non_delivery_unit_cost': '单位欠交罚金'
             };
@@ -6904,8 +6918,8 @@
                             <option value="fixed_production_cost" ${rule.field === 'fixed_production_cost' ? 'selected' : ''}>固定生产成本</option>
                             <option value="fixed_purchase_cost" ${rule.field === 'fixed_purchase_cost' ? 'selected' : ''}>固定采购成本</option>
                             <option value="fixed_transport_cost" ${rule.field === 'fixed_transport_cost' ? 'selected' : ''}>固定运输成本</option>
-                            <option value="maximum_violation_unit_cost" ${rule.field === 'maximum_violation_unit_cost' ? 'selected' : ''}>单位最大库存违反成本</option>
-                            <option value="holding_time_cost" ${rule.field === 'holding_time_cost' ? 'selected' : ''}>库存持有成本</option>
+                            <option value="warehouse_storage_cost_rate" ${rule.field === 'warehouse_storage_cost_rate' ? 'selected' : ''}>仓储成本率（年化）</option>
+                            <option value="capital_rate" ${rule.field === 'capital_rate' ? 'selected' : ''}>资金成本率（年化）</option>
                             <option value="late_delivery_unit_cost" ${rule.field === 'late_delivery_unit_cost' ? 'selected' : ''}>单位晚交罚金</option>
                             <option value="non_delivery_unit_cost" ${rule.field === 'non_delivery_unit_cost' ? 'selected' : ''}>单位欠交罚金</option>
                         </select>
@@ -7074,7 +7088,7 @@
                 production: ['复选框', '物品代码', '库存点', '版本', '时段', '生产资源代码', '资源类别', '单位生产成本', '固定生产成本', '生产成本合计', '货币', '备注', '操作'],
                 purchase: ['复选框', '物品代码', '库存点', '版本', '时段', '采购路径代码', '供应商', '单位采购成本', '固定采购成本', '采购成本合计', '货币', '备注', '操作'],
                 transport: ['复选框', '物品代码', '库存点', '版本', '时段', '运输路径代码', '来源库存点', '单位运输成本', '固定运输成本', '运输成本合计', '货币', '备注', '操作'],
-                inventory: ['复选框', '物品代码', '库存点', '版本', '时段', '单位最大库存违反成本', '库存持有成本', '资金占用成本率（年化）', '库存成本合计', '货币', '备注', '操作'],
+                inventory: ['复选框', '物品代码', '库存点', '版本', '时段', '仓储成本率（年化）', '资金成本率（年化）', '库存成本合计（率）', '货币', '备注', '操作'],
                 penalty: ['复选框', '客户', '版本', '时段', '单位晚交罚金', '单位欠交罚金', '违约罚金合计', '货币', '备注', '操作']
             };
             

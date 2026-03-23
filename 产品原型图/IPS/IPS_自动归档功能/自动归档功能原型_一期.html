@@ -64,6 +64,19 @@
         .btn-primary:disabled { opacity: 0.55; cursor: not-allowed; }
         .btn-default { background: #fff; border: 1px solid var(--card-border); color: var(--text); }
         .btn-default:hover { background: var(--primary-light); border-color: var(--primary); }
+        .btn-danger {
+            background: var(--error);
+            color: #fff;
+            border: 1px solid #dc2626;
+        }
+        .btn-danger:hover { background: #dc2626; filter: brightness(0.95); }
+        .btn-danger:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-outline-danger {
+            background: #fff;
+            color: var(--error);
+            border: 1px solid #fecaca;
+        }
+        .btn-outline-danger:hover { background: var(--error-bg); border-color: var(--error); }
         .btn-sm { padding: 4px 10px; font-size: 12px; }
 
         .form-label {
@@ -151,6 +164,7 @@
         .badge-run { background: var(--warning-bg); color: #b45309; }
         .badge-err { background: var(--error-bg); color: var(--error); }
         .badge-neu { background: #f1f5f9; color: var(--muted); }
+        .badge-void { background: #fee2e2; color: #b91c1c; }
 
         .log-main-row { cursor: pointer; }
         .log-main-row:hover { background: var(--primary-light); }
@@ -352,19 +366,7 @@
                 <th style="width: 26%;">操作</th>
             </tr>
         </thead>
-        <tbody>
-            <tr>
-                <td>SCH_CO_Archive</td>
-                <td>SCH</td>
-                <td><code style="font-size:16px;">scp_sch</code></td>
-                <td>客户订单<div class="hint-text" style="margin:0;">系统关联 3 张表</div></td>
-                <td>按时间：30 日之前</td>
-                <td>
-                    <button type="button" class="btn btn-primary btn-sm" onclick="startTriggerFlow()">触发归档</button>
-                    <button type="button" class="btn btn-default btn-sm" onclick="openEditModal()">编辑</button>
-                    <button type="button" class="btn btn-default btn-sm" onclick="openLogModal()">日志</button>
-                </td>
-            </tr>
+        <tbody id="configTableBody">
         </tbody>
     </table>
 
@@ -432,8 +434,20 @@
                 </div>
             </div>
 
-            <div class="section-title">3. 归档规则（按时间条件）</div>
-            <div style="background: #f8fafc; padding: 15px; border-radius: var(--radius-sm); border: 1px solid var(--card-border);">
+            <div class="section-title">3. 归档规则</div>
+            <div class="flex-row" style="margin-bottom: 12px;">
+                <div style="flex: 1; min-width: 280px;">
+                    <label class="form-label">条件类型 <span style="color: var(--error);">*</span></label>
+                    <select class="form-select w-full" id="ruleConditionType" onchange="onRuleConditionTypeChange()">
+                        <option value="time_only" selected>仅时间条件（一期）</option>
+                        <option value="composite">复合条件（多字段且/或，后续迭代）</option>
+                    </select>
+                    <p class="hint-text" id="ruleConditionTypeHint">「仅时间条件」与「复合条件」互斥展示表单：选复合条件时隐藏独立「时间条件」区块，仅展示复合预留区。</p>
+                </div>
+            </div>
+
+            <div id="timeRuleBlock" style="background: #f8fafc; padding: 15px; border-radius: var(--radius-sm); border: 1px solid var(--card-border); margin-top: 12px;">
+                <div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:10px;">时间条件</div>
                 <div class="flex-row" style="align-items: center;">
                     <span style="font-size:13px;color:var(--text-muted);min-width:72px;">基准字段</span>
                     <input type="text" class="form-input" id="baseField" value="created_at" placeholder="如：created_at" style="width: 200px;">
@@ -448,6 +462,49 @@
                         <option value="year">年</option>
                     </select>
                     <span style="font-size:13px;">之前的数据（基于服务器时间）</span>
+                </div>
+            </div>
+
+            <div id="compositeRuleBlock" class="hidden" style="background: #fefce8; padding: 15px; border-radius: var(--radius-sm); border: 1px solid #fde047; margin-top: 12px;">
+                <div style="font-size:12px;font-weight:600;color:#854d0e;margin-bottom:10px;">复合条件（预留）</div>
+                <p class="hint-text" style="margin-top:0;">复合条件由<strong>多个字段条件</strong>通过<strong>且（AND）/ 或（OR）</strong>组合而成；一期界面预留入口，具体字段、运算符与保存逻辑在后续版本与后端对齐后开放。</p>
+                <div class="flex-row" style="align-items: center; margin-top: 12px; flex-wrap: wrap;">
+                    <span style="font-size:13px;color:var(--text-muted);min-width:88px;">子条件关系</span>
+                    <select class="form-select" id="compositeJoin" style="width: 120px;" disabled title="后续迭代开放">
+                        <option value="and">且（AND）</option>
+                        <option value="or">或（OR）</option>
+                    </select>
+                    <span class="hint-text" style="margin:0;">预览占位，一期不可编辑</span>
+                </div>
+                <div style="margin-top: 14px; opacity: 0.65; pointer-events: none;">
+                    <table class="mini-table" style="max-width:100%;">
+                        <thead>
+                            <tr>
+                                <th>序号</th>
+                                <th>字段</th>
+                                <th>运算符</th>
+                                <th>值</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>1</td>
+                                <td><input type="text" class="form-input" value="status" readonly style="width:100%;box-sizing:border-box;"></td>
+                                <td>
+                                    <select class="form-select" disabled><option>=</option></select>
+                                </td>
+                                <td><input type="text" class="form-input" value="CLOSED" readonly style="width:100%;box-sizing:border-box;"></td>
+                            </tr>
+                            <tr>
+                                <td>2</td>
+                                <td><input type="text" class="form-input" value="created_at" readonly style="width:100%;box-sizing:border-box;"></td>
+                                <td>
+                                    <select class="form-select" disabled><option>&lt;</option></select>
+                                </td>
+                                <td><span style="font-size:12px;color:var(--text-muted);">时间类字段可作为子条件之一（示意）</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
@@ -592,8 +649,85 @@ let currentConfig = {
     bizObjectId: 'CUSTOMER_ORDER',
     baseField: 'created_at',
     timeValue: 30,
-    timeUnit: 'day'
+    timeUnit: 'day',
+    ruleConditionType: 'time_only'
 };
+
+/** 列表行演示：作废后不可触发、不可编辑，仅日志 + 重启 */
+let mainDemoConfig = {
+    id: 'demo-1',
+    name: 'SCH_CO_Archive',
+    module: 'SCH',
+    sceneCode: 'scp_sch',
+    objectLabel: '客户订单',
+    tableCount: 3,
+    ruleSummary: '按时间：30 日之前',
+    voided: false
+};
+
+function renderConfigTable() {
+    const body = document.getElementById('configTableBody');
+    if (!body) return;
+    const c = mainDemoConfig;
+    const nameCell = c.voided
+        ? `<span style="display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap;">${c.name}<span class="badge badge-void">已作废</span></span>`
+        : c.name;
+    const ops = c.voided
+        ? `
+            <button type="button" class="btn btn-default btn-sm" onclick="openLogModal()">日志</button>
+            <button type="button" class="btn btn-outline-danger btn-sm" onclick="restartArchiveConfig()">重启</button>
+        `
+        : `
+            <button type="button" class="btn btn-primary btn-sm" onclick="startTriggerFlow()">触发归档</button>
+            <button type="button" class="btn btn-default btn-sm" onclick="openEditModal()">编辑</button>
+            <button type="button" class="btn btn-default btn-sm" onclick="openLogModal()">日志</button>
+            <button type="button" class="btn btn-danger btn-sm" onclick="voidArchiveConfig()">作废</button>
+        `;
+    body.innerHTML = `
+        <tr>
+            <td>${nameCell}</td>
+            <td>${c.module}</td>
+            <td><code style="font-size:16px;">${c.sceneCode}</code></td>
+            <td>${c.objectLabel}<div class="hint-text" style="margin:0;">系统关联 ${c.tableCount} 张表</div></td>
+            <td>${c.ruleSummary}</td>
+            <td><div class="flex-row" style="gap:8px;align-items:center;flex-wrap:wrap;">${ops}</div></td>
+        </tr>
+    `;
+}
+
+function voidArchiveConfig() {
+    if (mainDemoConfig.voided) return;
+    if (!confirm('确定作废该归档配置？\n\n作废后将无法触发归档、无法编辑配置，仅可查看日志；可通过「重启」恢复为可用状态。')) return;
+    mainDemoConfig.voided = true;
+    renderConfigTable();
+}
+
+function restartArchiveConfig() {
+    if (!mainDemoConfig.voided) return;
+    if (!confirm('确定重启该归档配置？\n\n重启后将恢复为可编辑、可触发归档状态。')) return;
+    mainDemoConfig.voided = false;
+    renderConfigTable();
+}
+
+function onRuleConditionTypeChange() {
+    const t = document.getElementById('ruleConditionType')?.value || 'time_only';
+    const timeBlock = document.getElementById('timeRuleBlock');
+    const compBlock = document.getElementById('compositeRuleBlock');
+    const hint = document.getElementById('ruleConditionTypeHint');
+    if (t === 'composite') {
+        timeBlock?.classList.add('hidden');
+        compBlock?.classList.remove('hidden');
+        if (hint) {
+            hint.textContent = '已切换为复合条件：独立「时间条件」表单已隐藏，下方为且/或与子条件占位。一期是否允许保存、是否与执行打通以后端与产品迭代为准。';
+        }
+    } else {
+        timeBlock?.classList.remove('hidden');
+        compBlock?.classList.add('hidden');
+        if (hint) {
+            hint.textContent = '「仅时间条件」与「复合条件」互斥展示表单：选复合条件时隐藏独立「时间条件」区块，仅展示复合预留区。';
+        }
+    }
+}
 
 let expandedLogId = null;
 
@@ -740,9 +874,16 @@ function revokeTask(id) {
 }
 
 function openEditModal() {
+    if (mainDemoConfig.voided) {
+        alert('该归档配置已作废，无法编辑。请先点击「重启」恢复后再编辑。');
+        return;
+    }
     document.getElementById('editModal').classList.remove('hidden');
     const bo = document.getElementById('bizObjectSelect');
     if (bo && currentConfig.bizObjectId) bo.value = currentConfig.bizObjectId;
+    const rct = document.getElementById('ruleConditionType');
+    if (rct) rct.value = currentConfig.ruleConditionType || 'time_only';
+    onRuleConditionTypeChange();
     fillSceneSelect();
     updateDbNamePreview();
 }
@@ -824,8 +965,9 @@ function saveConfig() {
     currentConfig.baseField = document.getElementById('baseField').value || 'created_at';
     currentConfig.timeValue = parseInt(document.getElementById('timeValue').value, 10) || 30;
     currentConfig.timeUnit = document.getElementById('timeUnit').value;
+    currentConfig.ruleConditionType = document.getElementById('ruleConditionType')?.value || 'time_only';
 
-    alert('保存成功！\n模块：' + module + '\n场景库：' + sceneDb + '\n业务对象：客户订单（系统将自动关联物理表，演示为 ' + DEMO_CO_TABLE_COUNT + ' 张）');
+    alert('保存成功！\n模块：' + module + '\n场景库：' + sceneDb + '\n业务对象：客户订单（系统将自动关联物理表，演示为 ' + DEMO_CO_TABLE_COUNT + ' 张）\n条件类型：' + (currentConfig.ruleConditionType === 'composite' ? '复合条件（预留，一期仍以时间条件生效）' : '仅时间条件'));
     closeEditModal();
 }
 
@@ -840,6 +982,10 @@ function closeSummaryModal() {
 }
 
 function startTriggerFlow() {
+    if (mainDemoConfig.voided) {
+        alert('该归档配置已作废，无法触发归档。请先点击「重启」恢复后再操作。');
+        return;
+    }
     document.getElementById('introModal').classList.remove('hidden');
 }
 
@@ -915,6 +1061,8 @@ document.getElementById('sceneSelect')?.addEventListener('change', () => {
     updateDbNamePreview();
 });
 
+onRuleConditionTypeChange();
+renderConfigTable();
 renderLogTable();
 </script>
 </body>
