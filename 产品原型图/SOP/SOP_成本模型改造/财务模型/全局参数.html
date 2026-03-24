@@ -756,7 +756,7 @@
             <div v-show="shouldShowParam('inventoryHoldingCostEnabled')" class="setting-item" :class="{ 'search-highlight': isParamMatched('inventoryHoldingCostEnabled') }">
               <div class="setting-label-wrapper">
                 <label class="setting-label">库存点物品的仓储成本率</label>
-                <span class="setting-desc">设置是否启用库存点物品的仓储成本率（年化）</span>
+                <span class="setting-desc">设置是否启用库存点物品的仓储成本率（按率计费，颗粒度由下方参数与成本明细行 time_cost_uom 决定）</span>
               </div>
               <div class="setting-control">
                 <el-select v-model="params.inventoryHoldingCostEnabled" placeholder="请选择" style="width: 280px;">
@@ -819,20 +819,24 @@
 
             <div v-show="shouldShowParam('defaultWarehouseStorageCostRate')" class="setting-item" :class="{ 'search-highlight': isParamMatched('defaultWarehouseStorageCostRate') }">
               <div class="setting-label-wrapper">
-                <label class="setting-label">默认仓储成本率（年化）</label>
-                <span class="setting-desc">用于初始化库存成本明细中的仓储成本率。例如年化仓储费率 3%，则填 3。所有库存点物品默认使用此值，可在成本明细中为特定物品单独维护。</span>
+                <label class="setting-label">默认仓储成本率</label>
+                <span class="setting-desc">用于初始化库存成本明细中的仓储成本率（百分比）。含义由「默认仓储费率时间颗粒度」决定：选「按年」则该值为每年费率，选「按月」则该值为每月费率。初始化写入成本行时须同步写入 `time_cost_uom`（YEAR/MONTH）。</span>
               </div>
               <div class="setting-control">
-                <div class="composite-control">
+                <div class="composite-control" style="flex-wrap: wrap; gap: 8px; align-items: center;">
                   <el-input-number
                     v-model="params.defaultWarehouseStorageCostRate"
                     :min="0"
                     :max="100"
                     :precision="2"
                     placeholder="请输入"
-                    style="width: 180px;"
+                    style="width: 160px;"
                   ></el-input-number>
                   <span class="composite-text">%</span>
+                  <el-select v-model="params.defaultWarehouseStorageCostRateUom" placeholder="颗粒度" style="width: 140px;">
+                    <el-option label="按年（YEAR）" value="YEAR"></el-option>
+                    <el-option label="按月（MONTH）" value="MONTH"></el-option>
+                  </el-select>
                 </div>
                 <el-tooltip :content="getWarehouseStorageCostRateTooltip()" placement="top" effect="dark">
                   <i class="el-icon-question param-help-icon"></i>
@@ -842,20 +846,24 @@
 
             <div v-show="shouldShowParam('defaultCapitalCostRate')" class="setting-item" :class="{ 'search-highlight': isParamMatched('defaultCapitalCostRate') }">
               <div class="setting-label-wrapper">
-                <label class="setting-label">默认资金成本率（年化）</label>
-                <span class="setting-desc">用于计算库存资金占用成本。例如企业银行贷款年化利率为 5%，则填 5。所有库存点物品默认使用此利率，可在成本明细中为特定物品单独维护。</span>
+                <label class="setting-label">默认资金成本率</label>
+                <span class="setting-desc">用于初始化库存资金占用相关成本率（百分比）。含义由「默认资金费率时间颗粒度」决定；初始化落表时须写入对应明细行的 `time_cost_uom`。</span>
               </div>
               <div class="setting-control">
-                <div class="composite-control">
+                <div class="composite-control" style="flex-wrap: wrap; gap: 8px; align-items: center;">
                   <el-input-number
                     v-model="params.defaultCapitalCostRate"
                     :min="0"
                     :max="100"
                     :precision="2"
                     placeholder="请输入"
-                    style="width: 180px;"
+                    style="width: 160px;"
                   ></el-input-number>
                   <span class="composite-text">%</span>
+                  <el-select v-model="params.defaultCapitalCostRateUom" placeholder="颗粒度" style="width: 140px;">
+                    <el-option label="按年（YEAR）" value="YEAR"></el-option>
+                    <el-option label="按月（MONTH）" value="MONTH"></el-option>
+                  </el-select>
                 </div>
                 <el-tooltip :content="getCapitalCostRateTooltip()" placement="top" effect="dark">
                   <i class="el-icon-question param-help-icon"></i>
@@ -920,10 +928,12 @@
             initTransportCostSource: '库存点物品',
             inventoryHoldingCostEnabled: '禁用',
             defaultWarehouseStorageCostRate: 0,
+            defaultWarehouseStorageCostRateUom: 'YEAR',
             customerShortageFixedPenaltyEnabled: '禁用',
             customerLateDeliveryFixedPenaltyEnabled: '禁用',
             inventoryCapitalCostEnabled: '禁用',
-            defaultCapitalCostRate: 0
+            defaultCapitalCostRate: 0,
+            defaultCapitalCostRateUom: 'YEAR'
           },
           originalParams: null,
           // 参数提示信息
@@ -946,12 +956,12 @@
             initProductionCostSource: '选择初始化时生产成本从库存点物品或物品候选资源获取。',
             initProcurementCostSource: '选择初始化时采购成本从库存点物品或采购路径获取。',
             initTransportCostSource: '选择初始化时运输成本从库存点物品或运输路径获取。',
-            inventoryHoldingCostEnabled: '启用时会考虑库存点物品的仓储成本率（年化）。',
-            defaultWarehouseStorageCostRate: '设置默认的仓储成本率（年化），用于初始化库存成本明细中的仓储成本率。所有库存点物品默认使用此值。',
+            inventoryHoldingCostEnabled: '启用时会考虑库存点物品的仓储成本率。',
+            defaultWarehouseStorageCostRate: '设置默认仓储成本率（%）及时间颗粒度 YEAR/MONTH；初始化写入明细行时须带 time_cost_uom。',
             customerShortageFixedPenaltyEnabled: '启用时会考虑客户的单位欠交固定罚金。',
             customerLateDeliveryFixedPenaltyEnabled: '启用时会考虑客户的单位晚交固定罚金。',
-            inventoryCapitalCostEnabled: '启用后，系统将根据库存金额和资金成本率（年化）计算库存资金占用成本。',
-            defaultCapitalCostRate: '设置默认的资金成本率（年化），用于计算库存资金占用成本。所有库存点物品默认使用此利率。'
+            inventoryCapitalCostEnabled: '启用后，系统将根据库存金额与资金成本率（结合 time_cost_uom）计算库存资金占用成本。',
+            defaultCapitalCostRate: '设置默认资金成本率（%）及时间颗粒度 YEAR/MONTH；初始化须写入明细行 time_cost_uom。'
           }
         }
       },
@@ -977,11 +987,11 @@
             initProcurementCostSource: { zh: '初始化时采购成本的取值来源', en: 'Init procurement cost source', category: 'finance' },
             initTransportCostSource: { zh: '初始化时运输成本的取值来源', en: 'Init transport cost source', category: 'finance' },
             inventoryHoldingCostEnabled: { zh: '库存点物品的仓储成本率', en: 'Warehouse storage cost rate', category: 'finance' },
-            defaultWarehouseStorageCostRate: { zh: '默认仓储成本率（年化）', en: 'Default warehouse storage cost rate (annualized)', category: 'finance' },
+            defaultWarehouseStorageCostRate: { zh: '默认仓储成本率', en: 'Default warehouse storage cost rate', category: 'finance' },
             customerShortageFixedPenaltyEnabled: { zh: '客户的单位欠交固定罚金', en: 'Customer shortage fixed penalty', category: 'finance' },
             customerLateDeliveryFixedPenaltyEnabled: { zh: '客户的单位晚交固定罚金', en: 'Customer late delivery fixed penalty', category: 'finance' },
             inventoryCapitalCostEnabled: { zh: '库存点物品的库存资金占用成本', en: 'Inventory capital cost', category: 'finance' },
-            defaultCapitalCostRate: { zh: '默认资金成本率（年化）', en: 'Default capital cost rate (annualized)', category: 'finance' }
+            defaultCapitalCostRate: { zh: '默认资金成本率', en: 'Default capital cost rate', category: 'finance' }
           }
         },
         searchResults() {

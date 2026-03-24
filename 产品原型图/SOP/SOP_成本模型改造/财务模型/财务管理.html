@@ -1230,8 +1230,10 @@
                                         <th style="width: 100px;">库存点</th>
                                         <th style="width: 100px;">版本</th>
                                         <th style="width: 130px;">时段</th>
-                                        <th style="width: 130px;">仓储成本率（年化）</th>
-                                        <th style="width: 130px;">资金成本率（年化）</th>
+                                        <th style="width: 110px;">仓储成本率(%)</th>
+                                        <th style="width: 100px;">仓储颗粒度</th>
+                                        <th style="width: 110px;">资金成本率(%)</th>
+                                        <th style="width: 100px;">资金颗粒度</th>
                                         <th style="width: 120px;">库存成本合计（率）</th>
                                         <th style="width: 80px;">货币</th>
                                         <th style="width: 120px;">备注</th>
@@ -1471,15 +1473,29 @@
                     <div class="cost-field-group" data-cost-type="inventory">
                         <div class="grid grid-cols-2 gap-4">
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">仓储成本率（年化）</label>
-                                <input type="number" id="editWarehouseStorageCostRate" name="warehouse_storage_cost_rate" step="0.01" min="0" max="100" class="w-full input" placeholder="如 3 表示 3%">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">仓储成本率（%）</label>
+                                <input type="number" id="editWarehouseStorageCostRate" name="warehouse_storage_cost_rate" step="0.01" min="0" max="100" class="w-full input" placeholder="百分比；含义由颗粒度决定">
                             </div>
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">资金成本率（年化）</label>
-                                <input type="number" id="editCapitalRate" name="capital_rate" step="0.01" min="0" max="100" class="w-full input" placeholder="如 5 表示 5%">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">仓储费率颗粒度（time_cost_uom）</label>
+                                <select id="editWarehouseStorageTimeUom" name="warehouse_storage_time_uom" class="w-full input">
+                                    <option value="YEAR">按年（YEAR）</option>
+                                    <option value="MONTH">按月（MONTH）</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">资金成本率（%）</label>
+                                <input type="number" id="editCapitalRate" name="capital_rate" step="0.01" min="0" max="100" class="w-full input" placeholder="百分比；含义由颗粒度决定">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">资金费率颗粒度（time_cost_uom）</label>
+                                <select id="editCapitalTimeUom" name="capital_time_uom" class="w-full input">
+                                    <option value="YEAR">按年（YEAR）</option>
+                                    <option value="MONTH">按月（MONTH）</option>
+                                </select>
                             </div>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">列表中「库存成本合计（率）」= 仓储成本率 + 资金成本率，仅展示、不可编辑。</p>
+                        <p class="text-xs text-gray-500 mt-2">落表时两条 RATE 行须分别带 `time_cost_uom`。列表「库存成本合计（率）」仅当仓储与资金颗粒度一致时为两者百分比之和，否则显示「—」。</p>
                     </div>
                     
                     <!-- 违约罚金相关字段（挂靠对象：客户） -->
@@ -2309,7 +2325,9 @@
                             start_time: period.start,
                             end_time: period.end,
                             warehouse_storage_cost_rate: round2(2 + Math.random() * 3),
+                            warehouse_storage_time_uom: Math.random() > 0.88 ? 'MONTH' : 'YEAR',
                             capital_rate: round2(8 + Math.random() * 4),
+                            capital_time_uom: Math.random() > 0.88 ? 'MONTH' : 'YEAR',
                             currency_unit_id: 'CNY',
                             remark: `库存-${product}-${stockPoint}-${version}`,
                             creator: 'admin',
@@ -2521,6 +2539,21 @@
             if (isNaN(n)) return '-';
             // 添加千分位
             return n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        }
+
+        /** 库存 RATE 行 time_cost_uom 展示（与 PRD YEAR/MONTH 一致） */
+        function inventoryUomLabel(u) {
+            return (u === 'MONTH') ? '月' : '年';
+        }
+        function inventoryRatesComparable(item) {
+            const u1 = item.warehouse_storage_time_uom || 'YEAR';
+            const u2 = item.capital_time_uom || 'YEAR';
+            return u1 === u2;
+        }
+        function inventoryTotalRateDisplay(item) {
+            if (!inventoryRatesComparable(item)) return '—';
+            const t = (item.warehouse_storage_cost_rate || 0) + (item.capital_rate || 0);
+            return formatNumber(t) + '%';
         }
 
         // 格式化百分比（保留两位小数，例如XX.XX%）
@@ -3386,7 +3419,7 @@
             const tbody = document.getElementById(tbodyId);
             if (!tbody) return;
 
-            const colspans = { production: 18, purchase: 18, transport: 18, inventory: 16, penalty: 14 };
+            const colspans = { production: 18, purchase: 18, transport: 18, inventory: 17, penalty: 14 };
             const colspan = colspans[currentTab] || 15;
 
             if (groups.length === 0) {
@@ -3494,10 +3527,11 @@
                         } else if (currentTab === 'inventory') {
                             const avgWh = groupAvg(group.items, 'warehouse_storage_cost_rate');
                             const avgCapital = groupAvg(group.items, 'capital_rate');
-                            const avgTotalRate = group.items.reduce((sum, item) => sum + ((item.warehouse_storage_cost_rate || 0) + (item.capital_rate || 0)), 0) / group.items.length;
-                            avgRow += `<td><span class="cost-badge inventory">${avgWh != null ? formatNumber(avgWh) + '%' : '-'}</span></td><td><span class="cost-badge inventory">${avgCapital != null ? formatNumber(avgCapital) + '%' : '-'}</span></td><td><span class="cost-badge inventory">${formatNumber(avgTotalRate)}%</span></td>`;
+                            avgRow += `<td><span class="cost-badge inventory">${avgWh != null ? formatNumber(avgWh) + '%' : '-'}</span></td><td class="text-xs text-gray-400">—</td><td><span class="cost-badge inventory">${avgCapital != null ? formatNumber(avgCapital) + '%' : '-'}</span></td><td class="text-xs text-gray-400">—</td><td><span class="cost-badge inventory">—</span></td>`;
                         }
-                        avgRow += `<td></td><td></td><td></td><td></td><td></td><td></td></tr>`;
+                        avgRow += currentTab === 'inventory'
+                            ? `<td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>`
+                            : `<td></td><td></td><td></td><td></td><td></td><td></td></tr>`;
                         html += avgRow;
                     }
 
@@ -3519,7 +3553,7 @@
                         `;
 
                         const cellKey = `${item.id}_${currentTab === 'production' ? 'production_cost' : currentTab === 'purchase' ? 'purchase_cost' : currentTab === 'transport' ? 'transport_cost' : currentTab === 'inventory' ? 'warehouse_storage_cost_rate' : 'late_delivery_unit_cost'}`;
-                        const isModified = modifiedCells.has(cellKey);
+                        const isModified = currentTab !== 'inventory' && modifiedCells.has(cellKey);
                         const modifiedClass = isModified ? 'modified' : '';
                         
                         if (currentTab === 'production') {
@@ -3579,16 +3613,27 @@
                             const capStr = formatNumber(item.capital_rate);
                             const whDisplay = whStr === '-' ? '-' : whStr + '%';
                             const capDisplay = capStr === '-' ? '-' : capStr + '%';
-                            const totalRate = (item.warehouse_storage_cost_rate || 0) + (item.capital_rate || 0);
+                            const whUom = item.warehouse_storage_time_uom || 'YEAR';
+                            const capUom = item.capital_time_uom || 'YEAR';
+                            const modWh = modifiedCells.has(`${item.id}_warehouse_storage_cost_rate`) ? 'modified' : '';
+                            const modWhU = modifiedCells.has(`${item.id}_warehouse_storage_time_uom`) ? 'modified' : '';
+                            const modCap = modifiedCells.has(`${item.id}_capital_rate`) ? 'modified' : '';
+                            const modCapU = modifiedCells.has(`${item.id}_capital_time_uom`) ? 'modified' : '';
                             rowHtml += `
-                                <td class="editable-cell ${modifiedClass}" data-row-id="${item.id}" data-field="warehouse_storage_cost_rate" data-original="${item.warehouse_storage_cost_rate ?? ''}">
+                                <td class="editable-cell ${modWh}" data-row-id="${item.id}" data-field="warehouse_storage_cost_rate" data-original="${item.warehouse_storage_cost_rate ?? ''}">
                                     <span class="cost-badge inventory">${whDisplay}</span>
                                 </td>
-                                <td class="editable-cell" data-row-id="${item.id}" data-field="capital_rate" data-original="${item.capital_rate ?? ''}">
+                                <td class="editable-cell ${modWhU}" data-row-id="${item.id}" data-field="warehouse_storage_time_uom" data-original="${whUom}">
+                                    <span class="cost-badge inventory">${inventoryUomLabel(whUom)}</span>
+                                </td>
+                                <td class="editable-cell ${modCap}" data-row-id="${item.id}" data-field="capital_rate" data-original="${item.capital_rate ?? ''}">
                                     <span class="cost-badge inventory">${capDisplay}</span>
                                 </td>
+                                <td class="editable-cell ${modCapU}" data-row-id="${item.id}" data-field="capital_time_uom" data-original="${capUom}">
+                                    <span class="cost-badge inventory">${inventoryUomLabel(capUom)}</span>
+                                </td>
                                 <td>
-                                    <span class="cost-badge inventory">${formatNumber(totalRate)}%</span>
+                                    <span class="cost-badge inventory">${inventoryTotalRateDisplay(item)}</span>
                                 </td>
                             `;
                         } else if (currentTab === 'penalty') {
@@ -3742,6 +3787,19 @@
             const rowId = cell.getAttribute('data-row-id');
             const field = cell.getAttribute('data-field');
             const originalValue = cell.getAttribute('data-original') || '';
+            const uomFields = ['warehouse_storage_time_uom', 'capital_time_uom'];
+            if (uomFields.includes(field)) {
+                const cur = (originalValue && String(originalValue).trim()) || 'YEAR';
+                cell.classList.add('editing');
+                cell.innerHTML = `<select class="cell-input cell-select-uom" style="max-width:100%"><option value="YEAR" ${cur === 'YEAR' ? 'selected' : ''}>年（YEAR）</option><option value="MONTH" ${cur === 'MONTH' ? 'selected' : ''}>月（MONTH）</option></select>`;
+                const sel = cell.querySelector('.cell-select-uom');
+                sel.focus();
+                sel.addEventListener('keydown', function(e) {
+                    if (e.key === 'Escape') { e.preventDefault(); cancelCellEdit(cell); }
+                });
+                sel.addEventListener('change', function() { finishCellEdit(cell); });
+                return;
+            }
             const rateFields = ['warehouse_storage_cost_rate', 'capital_rate'];
             let seed = '';
             if (rateFields.includes(field)) {
@@ -3779,12 +3837,39 @@
         function finishCellEdit(cell) {
             if (!cell || !cell.classList.contains('editing')) return;
 
-            const input = cell.querySelector('.cell-input');
-            const newValue = input ? input.value.trim() : '';
             const rowId = cell.getAttribute('data-row-id');
             const field = cell.getAttribute('data-field');
             const originalValue = cell.getAttribute('data-original') || '';
-            
+            const uomFields = ['warehouse_storage_time_uom', 'capital_time_uom'];
+            if (uomFields.includes(field)) {
+                const sel = cell.querySelector('.cell-select-uom');
+                const strValue = sel ? sel.value : 'YEAR';
+                const item = getCostItemById(rowId);
+                if (item) {
+                    item[field] = strValue;
+                    const cellKey = `${rowId}_${field}`;
+                    const prevU = (originalValue && String(originalValue).trim()) || 'YEAR';
+                    const hasChanged = strValue !== prevU;
+                    if (hasChanged) {
+                        if (!modifiedCells.has(cellKey)) modifiedCells.set(cellKey, prevU);
+                        markAsModified();
+                    } else {
+                        modifiedCells.delete(cellKey);
+                        if (modifiedCells.size === 0) markAsSaved();
+                    }
+                }
+                const isModified = modifiedCells.has(`${rowId}_${field}`);
+                cell.classList.remove('editing');
+                cell.classList.toggle('modified', isModified);
+                cell.setAttribute('data-original', strValue);
+                cell.innerHTML = `<span class="cost-badge inventory">${inventoryUomLabel(strValue)}</span>`;
+                currentEditingCell = null;
+                renderTable();
+                return;
+            }
+
+            const input = cell.querySelector('.cell-input');
+            const newValue = input ? input.value.trim() : '';
             const numValue = newValue === '' ? null : round2(parseFloat(newValue));
             let displayValue = numValue === null ? '-' : formatNumber(numValue);
             if (field === 'warehouse_storage_cost_rate' || field === 'capital_rate') {
@@ -3841,7 +3926,9 @@
             const field = cell.getAttribute('data-field');
             const originalValue = cell.getAttribute('data-original') || '';
             let displayValue;
-            if (originalValue === '' || originalValue === null) {
+            if (field === 'warehouse_storage_time_uom' || field === 'capital_time_uom') {
+                displayValue = inventoryUomLabel(originalValue || 'YEAR');
+            } else if (originalValue === '' || originalValue === null) {
                 displayValue = '-';
             } else if (field === 'warehouse_storage_cost_rate' || field === 'capital_rate') {
                 displayValue = formatNumber(parseFloat(originalValue)) + '%';
@@ -3853,6 +3940,7 @@
                               field === 'purchase_cost' || field === 'fixed_purchase_cost' ? 'purchase' : 
                               field === 'transport_cost' || field === 'fixed_transport_cost' ? 'transport' : 
                               field === 'warehouse_storage_cost_rate' || field === 'capital_rate' ? 'inventory' : 
+                              field === 'warehouse_storage_time_uom' || field === 'capital_time_uom' ? 'inventory' :
                               field === 'late_delivery_unit_cost' || field === 'non_delivery_unit_cost' ? 'penalty' : 'production';
             cell.classList.remove('editing');
             cell.innerHTML = `<span class="cost-badge ${badgeClass}">${displayValue}</span>`;
@@ -4265,6 +4353,12 @@
                     editPenaltyCustomerId.removeAttribute('readonly');
                     editPenaltyCustomerId.classList.remove('bg-gray-50', 'cursor-not-allowed');
                 }
+                if (currentTab === 'inventory') {
+                    const whUomEl = document.getElementById('editWarehouseStorageTimeUom');
+                    const capUomEl = document.getElementById('editCapitalTimeUom');
+                    if (whUomEl) whUomEl.value = 'YEAR';
+                    if (capUomEl) capUomEl.value = 'YEAR';
+                }
                 
                 // 根据当前标签页设置字段的可编辑性
                 readonlyFields.forEach(fieldId => {
@@ -4314,6 +4408,10 @@
                 } else if (currentTab === 'inventory') {
                     document.getElementById('editWarehouseStorageCostRate').value = item.warehouse_storage_cost_rate ?? '';
                     document.getElementById('editCapitalRate').value = item.capital_rate ?? '';
+                    const whUomEl = document.getElementById('editWarehouseStorageTimeUom');
+                    const capUomEl = document.getElementById('editCapitalTimeUom');
+                    if (whUomEl) whUomEl.value = item.warehouse_storage_time_uom || 'YEAR';
+                    if (capUomEl) capUomEl.value = item.capital_time_uom || 'YEAR';
                 } else if (currentTab === 'penalty') {
                     document.getElementById('editLateDeliveryUnitCost').value = item.late_delivery_unit_cost ?? '';
                     document.getElementById('editNonDeliveryUnitCost').value = item.non_delivery_unit_cost ?? '';
@@ -4366,6 +4464,10 @@
             } else if (currentTab === 'inventory') {
                 data.warehouse_storage_cost_rate = data.warehouse_storage_cost_rate ? round2(parseFloat(data.warehouse_storage_cost_rate)) : null;
                 data.capital_rate = data.capital_rate ? round2(parseFloat(data.capital_rate)) : null;
+                const whUomEl = document.getElementById('editWarehouseStorageTimeUom');
+                const capUomEl = document.getElementById('editCapitalTimeUom');
+                data.warehouse_storage_time_uom = whUomEl ? whUomEl.value : 'YEAR';
+                data.capital_time_uom = capUomEl ? capUomEl.value : 'YEAR';
             } else if (currentTab === 'penalty') {
                 data.customer_id = document.getElementById('editPenaltyCustomerId').value?.trim() || null;
                 data.late_delivery_unit_cost = data.late_delivery_unit_cost ? round2(parseFloat(data.late_delivery_unit_cost)) : null;
@@ -4880,10 +4982,12 @@
                                     <div class="flex items-center gap-3 p-3 bg-gray-50 rounded">
                                         <div class="flex-1">
                                             <div class="text-sm text-gray-600 mb-1">时段: ${formatPeriod(item.start_time, item.end_time)}</div>
-                                            <div class="text-xs text-gray-500">仓储成本率: ${formatNumber(item.warehouse_storage_cost_rate)}% | 资金成本率: ${formatNumber(item.capital_rate)}% | 合计（率）: ${formatNumber((item.warehouse_storage_cost_rate || 0) + (item.capital_rate || 0))}%</div>
+                                            <div class="text-xs text-gray-500">仓储: ${formatNumber(item.warehouse_storage_cost_rate)}%（${inventoryUomLabel(item.warehouse_storage_time_uom || 'YEAR')}）| 资金: ${formatNumber(item.capital_rate)}%（${inventoryUomLabel(item.capital_time_uom || 'YEAR')}）| 合计: ${inventoryTotalRateDisplay(item)}</div>
                                         </div>
-                                        <div class="w-28"><input type="number" step="0.01" min="0" max="100" placeholder="仓储%" class="w-full input text-sm batch-cost-input" data-item-id="${item.id}" data-field="warehouse_storage_cost_rate"></div>
-                                        <div class="w-28"><input type="number" step="0.01" min="0" max="100" placeholder="资金%" class="w-full input text-sm batch-cost-input" data-item-id="${item.id}" data-field="capital_rate"></div>
+                                        <div class="w-24"><input type="number" step="0.01" min="0" max="100" placeholder="仓储%" class="w-full input text-sm batch-cost-input" data-item-id="${item.id}" data-field="warehouse_storage_cost_rate"></div>
+                                        <div class="w-24"><select class="w-full input text-sm batch-uom-select" data-item-id="${item.id}" data-field="warehouse_storage_time_uom"><option value="YEAR" ${(item.warehouse_storage_time_uom || 'YEAR') === 'YEAR' ? 'selected' : ''}>年</option><option value="MONTH" ${item.warehouse_storage_time_uom === 'MONTH' ? 'selected' : ''}>月</option></select></div>
+                                        <div class="w-24"><input type="number" step="0.01" min="0" max="100" placeholder="资金%" class="w-full input text-sm batch-cost-input" data-item-id="${item.id}" data-field="capital_rate"></div>
+                                        <div class="w-24"><select class="w-full input text-sm batch-uom-select" data-item-id="${item.id}" data-field="capital_time_uom"><option value="YEAR" ${(item.capital_time_uom || 'YEAR') === 'YEAR' ? 'selected' : ''}>年</option><option value="MONTH" ${item.capital_time_uom === 'MONTH' ? 'selected' : ''}>月</option></select></div>
                                     </div>
                                 `).join('')}
                             </div>
@@ -4971,6 +5075,19 @@
         document.getElementById('confirmBatchEditBtn').addEventListener('click', function() {
             let updateCount = 0;
             
+            document.querySelectorAll('.batch-uom-select').forEach(sel => {
+                const itemId = sel.getAttribute('data-item-id');
+                const field = sel.getAttribute('data-field');
+                const item = getCostItemById(itemId);
+                if (item && field && currentTab === 'inventory') {
+                    const v = sel.value;
+                    if (item[field] !== v) {
+                        item[field] = v;
+                        updateCount++;
+                    }
+                }
+            });
+
             // 从新的输入方式读取成本值
             document.querySelectorAll('.batch-cost-input').forEach(input => {
                 const itemId = input.getAttribute('data-item-id');
@@ -6712,8 +6829,10 @@
                             <option value="fixed_production_cost" ${rule.field === 'fixed_production_cost' ? 'selected' : ''}>固定生产成本</option>
                             <option value="fixed_purchase_cost" ${rule.field === 'fixed_purchase_cost' ? 'selected' : ''}>固定采购成本</option>
                             <option value="fixed_transport_cost" ${rule.field === 'fixed_transport_cost' ? 'selected' : ''}>固定运输成本</option>
-                            <option value="warehouse_storage_cost_rate" ${rule.field === 'warehouse_storage_cost_rate' ? 'selected' : ''}>仓储成本率（年化）</option>
-                            <option value="capital_rate" ${rule.field === 'capital_rate' ? 'selected' : ''}>资金成本率（年化）</option>
+                            <option value="warehouse_storage_cost_rate" ${rule.field === 'warehouse_storage_cost_rate' ? 'selected' : ''}>仓储成本率（%）</option>
+                            <option value="warehouse_storage_time_uom" ${rule.field === 'warehouse_storage_time_uom' ? 'selected' : ''}>仓储费率颗粒度</option>
+                            <option value="capital_rate" ${rule.field === 'capital_rate' ? 'selected' : ''}>资金成本率（%）</option>
+                            <option value="capital_time_uom" ${rule.field === 'capital_time_uom' ? 'selected' : ''}>资金费率颗粒度</option>
                             <option value="late_delivery_unit_cost" ${rule.field === 'late_delivery_unit_cost' ? 'selected' : ''}>单位晚交罚金</option>
                             <option value="non_delivery_unit_cost" ${rule.field === 'non_delivery_unit_cost' ? 'selected' : ''}>单位欠交罚金</option>
                         </select>
@@ -6761,8 +6880,10 @@
                 'fixed_production_cost': '固定生产成本',
                 'fixed_purchase_cost': '固定采购成本',
                 'fixed_transport_cost': '固定运输成本',
-                'warehouse_storage_cost_rate': '仓储成本率（年化）',
-                'capital_rate': '资金成本率（年化）',
+                'warehouse_storage_cost_rate': '仓储成本率（%）',
+                'warehouse_storage_time_uom': '仓储费率颗粒度',
+                'capital_rate': '资金成本率（%）',
+                'capital_time_uom': '资金费率颗粒度',
                 'late_delivery_unit_cost': '单位晚交罚金',
                 'non_delivery_unit_cost': '单位欠交罚金'
             };
@@ -6918,8 +7039,10 @@
                             <option value="fixed_production_cost" ${rule.field === 'fixed_production_cost' ? 'selected' : ''}>固定生产成本</option>
                             <option value="fixed_purchase_cost" ${rule.field === 'fixed_purchase_cost' ? 'selected' : ''}>固定采购成本</option>
                             <option value="fixed_transport_cost" ${rule.field === 'fixed_transport_cost' ? 'selected' : ''}>固定运输成本</option>
-                            <option value="warehouse_storage_cost_rate" ${rule.field === 'warehouse_storage_cost_rate' ? 'selected' : ''}>仓储成本率（年化）</option>
-                            <option value="capital_rate" ${rule.field === 'capital_rate' ? 'selected' : ''}>资金成本率（年化）</option>
+                            <option value="warehouse_storage_cost_rate" ${rule.field === 'warehouse_storage_cost_rate' ? 'selected' : ''}>仓储成本率（%）</option>
+                            <option value="warehouse_storage_time_uom" ${rule.field === 'warehouse_storage_time_uom' ? 'selected' : ''}>仓储费率颗粒度</option>
+                            <option value="capital_rate" ${rule.field === 'capital_rate' ? 'selected' : ''}>资金成本率（%）</option>
+                            <option value="capital_time_uom" ${rule.field === 'capital_time_uom' ? 'selected' : ''}>资金费率颗粒度</option>
                             <option value="late_delivery_unit_cost" ${rule.field === 'late_delivery_unit_cost' ? 'selected' : ''}>单位晚交罚金</option>
                             <option value="non_delivery_unit_cost" ${rule.field === 'non_delivery_unit_cost' ? 'selected' : ''}>单位欠交罚金</option>
                         </select>
@@ -7088,7 +7211,7 @@
                 production: ['复选框', '物品代码', '库存点', '版本', '时段', '生产资源代码', '资源类别', '单位生产成本', '固定生产成本', '生产成本合计', '货币', '备注', '操作'],
                 purchase: ['复选框', '物品代码', '库存点', '版本', '时段', '采购路径代码', '供应商', '单位采购成本', '固定采购成本', '采购成本合计', '货币', '备注', '操作'],
                 transport: ['复选框', '物品代码', '库存点', '版本', '时段', '运输路径代码', '来源库存点', '单位运输成本', '固定运输成本', '运输成本合计', '货币', '备注', '操作'],
-                inventory: ['复选框', '物品代码', '库存点', '版本', '时段', '仓储成本率（年化）', '资金成本率（年化）', '库存成本合计（率）', '货币', '备注', '操作'],
+                inventory: ['复选框', '物品代码', '库存点', '版本', '时段', '仓储成本率(%)', '仓储颗粒度', '资金成本率(%)', '资金颗粒度', '库存成本合计（率）', '货币', '备注', '操作'],
                 penalty: ['复选框', '客户', '版本', '时段', '单位晚交罚金', '单位欠交罚金', '违约罚金合计', '货币', '备注', '操作']
             };
             
