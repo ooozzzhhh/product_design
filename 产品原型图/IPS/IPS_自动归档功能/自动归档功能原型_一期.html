@@ -165,6 +165,19 @@
         .badge-err { background: var(--error-bg); color: var(--error); }
         .badge-neu { background: #f1f5f9; color: var(--muted); }
         .badge-void { background: #fee2e2; color: #b91c1c; }
+        /* 归档中：源数据向新归档库建档/迁移过程 */
+        .badge-archiving { background: rgba(245, 158, 11, 0.14); color: #b45309; }
+        /* 窗口期：归档侧已建档，源数据尚未删除，展示剩余时间直至自动删源 */
+        .badge-window { background: rgba(14, 165, 233, 0.12); color: #0369a1; }
+        .window-remain {
+            font-size: 12px;
+            font-variant-numeric: tabular-nums;
+            color: #0369a1;
+            font-weight: 600;
+            line-height: 1.4;
+        }
+        .window-remain.muted { color: var(--text-muted); font-weight: 400; }
+        .window-remain-hint { font-size: 11px; color: var(--text-muted); margin-top: 2px; font-weight: 400; }
 
         .log-main-row { cursor: pointer; }
         .log-main-row:hover { background: var(--primary-light); }
@@ -530,14 +543,14 @@
             </div>
             <div class="intro-block">
                 <h4>归档流程（概要）</h4>
-                <p style="margin:0;">1）创建目标归档库（命名含场景库名与时间戳）→ 2）按表迁移符合条件的数据 → 3）校验目标数据 → 4）按策略处理源表数据（如删除已归档行）。任务状态与源/目标处理状态在日志中分别展示。</p>
+                <p style="margin:0;">1）创建目标归档库（命名含场景库名与时间戳）→ 2）按表将源数据在新归档库中<strong>建档</strong>（迁移）→ 3）校验目标数据 → 4）进入<strong>窗口期</strong>（归档已就绪、源数据暂保留）→ 5）窗口期结束后<strong>自动删除</strong>源端已归档数据。日志以统一「状态」展示：<strong>归档中</strong>、<strong>窗口期</strong>、<strong>成功</strong>、<strong>失败</strong>。</p>
             </div>
             <div class="intro-block" style="border-color: #fecaca; background: linear-gradient(135deg, #fffbeb 0%, #fef2f2 100%);">
                 <h4 style="color:#991b1b;">风险与注意</h4>
                 <ul class="risk-list">
                     <li>时间范围配置错误可能导致<strong>误归档近期订单</strong>，请与业务确认窗口。</li>
                     <li>大表归档占用 IO 与磁盘，建议在<strong>业务低峰</strong>执行。</li>
-                    <li>源数据删除前可通过日志中的状态判断；<strong>未删除</strong>前支持撤回任务。</li>
+                    <li><strong>归档中</strong>与<strong>窗口期</strong>内源数据尚未按终态清理前，可按规则支持<strong>撤回</strong>；窗口期日志会展示距离自动删源的剩余时间。</li>
                 </ul>
             </div>
         </div>
@@ -594,13 +607,12 @@
                 <colgroup>
                     <col class="log-col-expand" style="width:36px">
                     <col style="width:11%">
-                    <col style="width:20%">
+                    <col style="width:18%">
+                    <col style="width:11%">
+                    <col style="width:10%">
+                    <col style="width:18%">
                     <col style="width:12%">
-                    <col style="width:10%">
-                    <col style="width:10%">
-                    <col style="width:10%">
-                    <col style="width:12%">
-                    <col style="width:15%">
+                    <col style="width:14%">
                 </colgroup>
                 <thead>
                     <tr>
@@ -608,9 +620,8 @@
                         <th scope="col">触发ID</th>
                         <th scope="col">目标归档库</th>
                         <th scope="col">对象 / 表数</th>
-                        <th scope="col">任务流程</th>
-                        <th scope="col">目标数据</th>
-                        <th scope="col">源数据</th>
+                        <th scope="col">状态</th>
+                        <th scope="col">窗口期剩余</th>
                         <th scope="col">触发时间</th>
                         <th scope="col">操作</th>
                     </tr>
@@ -731,7 +742,11 @@ function onRuleConditionTypeChange() {
 
 let expandedLogId = null;
 
-/** 演示用日志数据 */
+/** 演示用日志数据
+ * 状态（统一）：成功 | 失败 | 归档中 | 窗口期
+ * - 归档中：源数据在新归档库中建档/迁移过程
+ * - 窗口期：归档数据已建档就绪，源数据尚未删除；windowRemain 为距自动删源的剩余时间
+ */
 let logEntries = [
     {
         id: 'e1',
@@ -739,15 +754,30 @@ let logEntries = [
         targetDb: 'scp_sch_archeive_20260320101530',
         objectName: '客户订单',
         tableCount: 3,
-        taskFlow: '成功',
-        targetStatus: '建档成功',
-        sourceStatus: '已删除',
+        status: '成功',
+        windowRemain: null,
         time: '2026-03-20 10:18:22',
-        remark: '-',
+        remark: '窗口期已结束，源数据已自动删除。',
         tables: [
             { name: 'sch_customer_order_hdr', orig: 128400, archived: 18200 },
             { name: 'sch_customer_order_line', orig: 502100, archived: 71200 },
             { name: 'sch_co_change_log', orig: 89000, archived: 12000 }
+        ]
+    },
+    {
+        id: 'e1b',
+        triggerId: 'ARCH-20260320-002',
+        targetDb: 'scp_sch_archeive_20260320093000',
+        objectName: '客户订单',
+        tableCount: 3,
+        status: '归档中',
+        windowRemain: null,
+        time: '2026-03-20 09:30:15',
+        remark: '正在将源数据写入新归档库并校验…',
+        tables: [
+            { name: 'sch_customer_order_hdr', orig: 128400, archived: 8200 },
+            { name: 'sch_customer_order_line', orig: 502100, archived: 21000 },
+            { name: 'sch_co_change_log', orig: 89000, archived: 0 }
         ]
     },
     {
@@ -756,11 +786,10 @@ let logEntries = [
         targetDb: 'scp_sch_archeive_20260319194500',
         objectName: '客户订单',
         tableCount: 3,
-        taskFlow: '进行中',
-        targetStatus: '建档成功',
-        sourceStatus: '未删除',
+        status: '窗口期',
+        windowRemain: { days: 2, hours: 5, minutes: 30 },
         time: '2026-03-19 19:45:08',
-        remark: '迁移完成，待源清理',
+        remark: '归档库已就绪，源数据保留至窗口期结束。',
         tables: [
             { name: 'sch_customer_order_hdr', orig: 128400, archived: 9100 },
             { name: 'sch_customer_order_line', orig: 502100, archived: 35600 },
@@ -773,9 +802,8 @@ let logEntries = [
         targetDb: 'scp_sch_archeive_20260318110200',
         objectName: '客户订单',
         tableCount: 3,
-        taskFlow: '失败',
-        targetStatus: '建档失败',
-        sourceStatus: '未删除',
+        status: '失败',
+        windowRemain: null,
         time: '2026-03-18 11:02:41',
         remark: '[IPS001] 创建归档库失败，请检查实例权限与磁盘空间。',
         tables: [
@@ -786,10 +814,24 @@ let logEntries = [
     }
 ];
 
-function badgeClass(kind) {
-    if (kind === '成功' || kind === '建档成功' || kind === '已删除') return 'badge-ok';
-    if (kind === '进行中' || kind === '未删除') return 'badge-neu';
-    return 'badge-err';
+function badgeClassForLogStatus(status) {
+    if (status === '成功') return 'badge-ok';
+    if (status === '失败') return 'badge-err';
+    if (status === '归档中') return 'badge-archiving';
+    if (status === '窗口期') return 'badge-window';
+    return 'badge-neu';
+}
+
+function formatWindowRemainCell(entry) {
+    if (entry.status === '窗口期' && entry.windowRemain) {
+        const r = entry.windowRemain;
+        return `<div><div class="window-remain">剩余 ${r.days} 天 ${r.hours} 小时 ${r.minutes} 分钟</div><div class="window-remain-hint">到期后系统将自动删除源数据</div></div>`;
+    }
+    return '<span class="window-remain muted">—</span>';
+}
+
+function canRevokeArchiveTask(entry) {
+    return entry.status === '归档中' || entry.status === '窗口期';
 }
 
 function buildDetailTiles(entry) {
@@ -822,13 +864,12 @@ function renderLogTable() {
             <td onclick="toggleLog('${entry.id}')"><code style="font-size:11px;">${entry.triggerId}</code></td>
             <td onclick="toggleLog('${entry.id}')"><code style="font-size:11px;word-break:break-all;">${entry.targetDb}</code></td>
             <td onclick="toggleLog('${entry.id}')">${entry.objectName}<div class="hint-text" style="margin:0;">${entry.tableCount} 张表</div></td>
-            <td onclick="toggleLog('${entry.id}')"><span class="badge ${badgeClass(entry.taskFlow)}">${entry.taskFlow}</span></td>
-            <td onclick="toggleLog('${entry.id}')"><span class="badge ${badgeClass(entry.targetStatus)}">${entry.targetStatus}</span></td>
-            <td onclick="toggleLog('${entry.id}')"><span class="badge ${badgeClass(entry.sourceStatus)}">${entry.sourceStatus}</span></td>
+            <td onclick="toggleLog('${entry.id}')"><span class="badge ${badgeClassForLogStatus(entry.status)}">${entry.status}</span></td>
+            <td onclick="toggleLog('${entry.id}')">${formatWindowRemainCell(entry)}</td>
             <td onclick="toggleLog('${entry.id}')">${entry.time}</td>
             <td onclick="event.stopPropagation();">
                 <div class="log-op-inner">
-                    ${entry.sourceStatus === '未删除'
+                    ${canRevokeArchiveTask(entry)
                         ? `<button type="button" class="btn btn-default btn-sm" onclick="revokeTask('${entry.id}')">撤回</button>`
                         : '<span class="log-op-placeholder">—</span>'}
                 </div>
@@ -841,11 +882,12 @@ function renderLogTable() {
             detailTr.className = 'log-detail-row';
             detailTr.innerHTML = `
                 <td class="log-col-expand"></td>
-                <td colspan="8">
+                <td colspan="7">
                     <div class="log-detail-inner">
                         <div class="detail-panel">
                             <div class="detail-panel-header">
                                 <strong>处理详情</strong>
+                                <span class="detail-panel-caption">状态说明：「归档中」= 向新归档库建档/迁移；「窗口期」= 归档已就绪、源数据保留至倒计时结束并自动删除；「成功」= 流程结束；「失败」= 异常终止。</span>
                             </div>
                             <div class="detail-tiles">${buildDetailTiles(entry)}</div>
                         </div>
@@ -867,9 +909,9 @@ function revokeTask(id) {
     const e = logEntries.find(x => x.id === id);
     if (!e) return;
     if (!confirm('确定撤回该归档任务？撤回后系统将中止对源数据的后续处理（具体以后端状态机为准）。')) return;
-    e.taskFlow = '失败';
+    e.status = '失败';
+    e.windowRemain = null;
     e.remark = '用户已撤回';
-    e.sourceStatus = '未删除';
     renderLogTable();
 }
 
@@ -1031,12 +1073,11 @@ function summaryConfirmTrigger() {
         targetDb: dbName,
         objectName: '客户订单',
         tableCount: 3,
-        taskFlow: '进行中',
-        targetStatus: '建档成功',
-        sourceStatus: '未删除',
+        status: '归档中',
+        windowRemain: null,
         time: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ` +
             `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`,
-        remark: '任务已提交',
+        remark: '任务已提交，正在新归档库中建档…',
         tables: [
             { name: 'sch_customer_order_hdr', orig: 128400, archived: 18200 },
             { name: 'sch_customer_order_line', orig: 502100, archived: 71200 },
