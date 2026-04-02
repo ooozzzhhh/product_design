@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>全局参数 - 需求优先级编码方案设置</title>
+
+  <!-- Element UI CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css">
+  <!-- Font Awesome图标 -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .global-params-page {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      background-color: #f5f7fa;
+    }
+
+    .top-header {
+      background-color: #ffffff;
+      border-bottom: 1px solid #e4e7ed;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+      flex-shrink: 0;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      margin-bottom: 24px;
+    }
+
+    .header-content {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 24px;
+    }
+
+    .header-title-section {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .header-icon {
+      width: 40px;
+      height: 40px;
+      background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ffffff;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .header-title-wrapper { display: flex; flex-direction: column; }
+    .header-title { margin: 0; font-size: 20px; font-weight: 700; color: #1e293b; line-height: 1.2; }
+    .header-subtitle { margin: 2px 0 0; font-size: 14px; color: #64748b; line-height: 1.2; }
+    .header-search { flex: 1; max-width: 400px; }
+
+    .main-container { display: flex; flex: 1; overflow: hidden; }
+
+    /* 左侧导航 */
+    .settings-sidebar {
+      width: 280px;
+      background-color: #ffffff;
+      border-right: 1px solid #e4e7ed;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 2px 0 8px rgba(0, 0, 0, 0.04);
+    }
+    .nav-scroll-wrapper { flex: 1; overflow-y: auto; overflow-x: hidden; }
+    .nav-list { list-style: none; padding: 8px 0; margin: 0; }
+    .nav-list li {
+      display: flex;
+      align-items: center;
+      padding: 12px 20px;
+      cursor: pointer;
+      transition: all 0.2s;
+      border-left: 3px solid transparent;
+    }
+    .nav-list li:hover { background-color: #f5f7fa; }
+    .nav-list li.active { background-color: #ecf5ff; border-left-color: #409eff; }
+    .nav-list li.active .nav-label { color: #409eff; font-weight: 500; }
+    .nav-list li.active .nav-icon { color: #409eff; }
+    .nav-icon { font-size: 16px; color: #606266; margin-right: 12px; width: 20px; text-align: center; }
+    .nav-label { font-size: 14px; color: #606266; flex: 1; }
+
+    /* 右侧内容 */
+    .settings-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background-color: #ffffff;
+      overflow: hidden;
+    }
+    .content-scroll-wrapper { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 24px 32px; }
+
+    .settings-section { margin-bottom: 40px; animation: fadeIn 0.3s; }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .section-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #303133;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #e4e7ed;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .permission-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 12px;
+      background-color: #fff7e6;
+      border: 1px solid #ffd666;
+      border-radius: 4px;
+      font-size: 12px;
+      color: #d46b08;
+      font-weight: 500;
+    }
+    .permission-badge i { margin-right: 4px; font-size: 14px; }
+
+    .section-desc { font-size: 13px; color: #909399; margin-bottom: 20px; line-height: 1.6; }
+
+    .config-layout { display: flex; gap: 24px; min-height: 560px; }
+
+    .source-list-panel {
+      flex: 0 0 300px;
+      background-color: #fafbfc;
+      border: 1px solid #e4e7ed;
+      border-radius: 4px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .panel-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #303133;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+    }
+    .panel-title i { margin-right: 6px; color: #409eff; }
+
+    .source-table-wrapper { flex: 1; overflow-y: auto; }
+
+    .field-config-panel {
+      flex: 1;
+      border: 1px solid #e4e7ed;
+      border-radius: 4px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .field-config-empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: #909399;
+    }
+    .field-config-empty i { font-size: 48px; margin-bottom: 16px; color: #dcdfe6; }
+
+    .config-sub-section {
+      margin-bottom: 20px;
+    }
+    .config-sub-section:last-child {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .sub-section-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #606266;
+      margin-bottom: 8px;
+      padding-bottom: 6px;
+      border-bottom: 1px dashed #dcdfe6;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .sub-section-title span { display: flex; align-items: center; }
+    .sub-section-title i { margin-right: 4px; }
+
+    .relation-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+      padding: 8px 12px;
+      background-color: #f5f7fa;
+      border-radius: 4px;
+      border: 1px solid #e4e7ed;
+    }
+    .relation-arrow {
+      color: #409eff;
+      font-size: 18px;
+      font-weight: bold;
+      flex-shrink: 0;
+      padding: 0 4px;
+    }
+    .relation-side-label {
+      font-size: 12px;
+      color: #909399;
+      flex-shrink: 0;
+      min-width: 50px;
+    }
+
+    .field-table-wrapper { flex: 1; overflow-y: auto; margin-top: 8px; }
+
+    .content-footer {
+      padding: 16px 32px;
+      border-top: 1px solid #e4e7ed;
+      background-color: #fafbfc;
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+    }
+
+    /* 滚动条 */
+    .nav-scroll-wrapper::-webkit-scrollbar,
+    .content-scroll-wrapper::-webkit-scrollbar,
+    .source-table-wrapper::-webkit-scrollbar,
+    .field-table-wrapper::-webkit-scrollbar {
+      width: 6px; height: 6px;
+    }
+    .nav-scroll-wrapper::-webkit-scrollbar-track,
+    .content-scroll-wrapper::-webkit-scrollbar-track,
+    .source-table-wrapper::-webkit-scrollbar-track,
+    .field-table-wrapper::-webkit-scrollbar-track { background: #f1f1f1; }
+    .nav-scroll-wrapper::-webkit-scrollbar-thumb,
+    .content-scroll-wrapper::-webkit-scrollbar-thumb,
+    .source-table-wrapper::-webkit-scrollbar-thumb,
+    .field-table-wrapper::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 3px; }
+
+    .el-table .cell { line-height: 1.5; }
+    .el-table__row.current-row { background-color: #ecf5ff !important; }
+
+    @media (max-width: 1400px) {
+      .config-layout { flex-direction: column; }
+      .source-list-panel { flex: 0 0 auto; max-height: 300px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div class="global-params-page">
+      <!-- 顶部栏 -->
+      <div class="top-header">
+        <div class="header-content">
+          <div class="header-title-section">
+            <div class="header-icon"><i class="fas fa-sliders-h"></i></div>
+            <div class="header-title-wrapper">
+              <h1 class="header-title">全局参数</h1>
+              <p class="header-subtitle">需求优先级编码方案设置</p>
+            </div>
+          </div>
+          <div class="header-search">
+            <el-input v-model="searchText" placeholder="搜索参数名称" prefix-icon="el-icon-search" size="medium" clearable></el-input>
+          </div>
+        </div>
+      </div>
+
+      <div class="main-container">
+        <!-- 左侧导航 -->
+        <div class="settings-sidebar">
+          <div class="nav-scroll-wrapper">
+            <ul class="nav-list">
+              <li v-for="category in categories" :key="category.key"
+                  :class="{ active: activeCategory === category.key }"
+                  @click="activeCategory = category.key">
+                <i :class="category.icon" class="nav-icon"></i>
+                <span class="nav-label">{{ category.label }}</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- 右侧内容 -->
+        <div class="settings-content">
+          <div class="content-scroll-wrapper">
+            <div v-show="activeCategory === 'priorityCoding'" class="settings-section">
+              <div class="section-title">
+                <span>需求优先级编码方案设置</span>
+                <span class="permission-badge"><i class="el-icon-lock"></i>仅实施顾问可见</span>
+              </div>
+              <p class="section-desc">
+                配置需求优先级编码方案的因子来源、关联关系与参与计算因子字段。实施顾问可根据项目需求调整配置，无需修改代码。配置完成后，用户在「优先级评分规则配置」弹窗中只能选择顾问配置的字段范围。
+              </p>
+
+              <!-- 编码形式配置 -->
+              <div style="margin-bottom: 32px;">
+                <h3 style="font-size: 14px; font-weight: 600; color: #303133; margin-bottom: 12px;">
+                  <i class="el-icon-document" style="margin-right: 6px; color: #409eff;"></i>编码形式配置
+                </h3>
+                <el-alert title="编码形式配置保持现有功能不变" type="info" :closable="false" show-icon></el-alert>
+              </div>
+
+              <!-- 加权求和配置 -->
+              <div>
+                <h3 style="font-size: 14px; font-weight: 600; color: #303133; margin-bottom: 12px;">
+                  <i class="el-icon-s-data" style="margin-right: 6px; color: #409eff;"></i>加权求和配置
+                </h3>
+
+                <div class="config-layout">
+                  <!-- 左侧：因子来源列表 -->
+                  <div class="source-list-panel">
+                    <div class="panel-title"><i class="el-icon-folder-opened"></i>因子来源</div>
+                    <div class="source-table-wrapper">
+                      <el-table :data="sourceTableData" highlight-current-row
+                                @current-change="handleSourceChange" size="small" style="width: 100%;">
+                        <el-table-column prop="label" label="来源名称" min-width="140"></el-table-column>
+                        <el-table-column prop="enabled" label="启用" width="60" align="center">
+                          <template slot-scope="scope">
+                            <el-switch v-model="scope.row.enabled" @change="handleSourceEnabledChange(scope.row)"></el-switch>
+                          </template>
+                        </el-table-column>
+                      </el-table>
+                    </div>
+                  </div>
+
+                  <!-- 右侧：关联关系 + 因子字段配置 -->
+                  <div class="field-config-panel">
+                    <div v-if="!currentSource" class="field-config-empty">
+                      <i class="el-icon-document-copy"></i>
+                      <p>请从左侧选择因子来源</p>
+                    </div>
+                    <div v-else style="display: flex; flex-direction: column; height: 100%;">
+                      <div class="panel-title">
+                        <i class="el-icon-tickets"></i>
+                        {{ currentSource.label }}（{{ currentSource.code }}）
+                      </div>
+
+                      <!-- 关联关系配置区 -->
+                      <div class="config-sub-section">
+                        <div class="sub-section-title">
+                          <span><i class="el-icon-connection"></i>关联关系配置</span>
+                          <el-button type="text" size="mini" icon="el-icon-plus"
+                                     @click="addRelation">新增关联</el-button>
+                        </div>
+                        <el-alert type="info" :closable="false" style="margin-bottom: 8px;">
+                          <template slot="title">
+                            <span style="font-size: 12px;">
+                              定义需求表与来源表的 JOIN 关系。例如：需求的 <code>customerId</code> 关联到客户表的 <code>id</code>，
+                              即 <code>LEFT JOIN customer ON demand.customerId = customer.id</code>
+                            </span>
+                          </template>
+                        </el-alert>
+                        <div v-for="(rel, idx) in currentRelations" :key="idx" class="relation-row">
+                          <span class="relation-side-label">需求端</span>
+                          <el-select v-model="rel.demandField" placeholder="需求字段" size="small" style="width: 200px;">
+                            <el-option v-for="f in demandIdFields" :key="f.value" :label="f.label" :value="f.value"></el-option>
+                          </el-select>
+                          <span class="relation-arrow">=</span>
+                          <span class="relation-side-label">来源端</span>
+                          <el-select v-model="rel.sourceField" placeholder="来源表字段" size="small" style="width: 200px;">
+                            <el-option v-for="f in currentSourceIdFields" :key="f.value" :label="f.label" :value="f.value"></el-option>
+                          </el-select>
+                          <el-button type="danger" icon="el-icon-delete" size="mini" circle
+                                     @click="removeRelation(idx)"></el-button>
+                        </div>
+                        <div v-if="currentRelations.length === 0" style="text-align: center; color: #c0c4cc; padding: 8px; font-size: 12px;">
+                          暂无关联关系，请点击「新增关联」
+                        </div>
+                      </div>
+
+                      <!-- 参与计算因子配置区 -->
+                      <div class="config-sub-section">
+                        <div class="sub-section-title">
+                          <span><i class="el-icon-s-data"></i>参与计算因子配置</span>
+                        </div>
+                        <el-alert type="info" :closable="false" style="margin-bottom: 8px;">
+                          <template slot="title">
+                            <span style="font-size: 12px;">
+                              勾选后，该字段将出现在「优先级评分规则配置」弹窗的因子下拉中，供用户配置评分规则。
+                            </span>
+                          </template>
+                        </el-alert>
+                        <div class="field-table-wrapper">
+                          <el-table :data="currentFieldData" size="small" border style="width: 100%;">
+                            <el-table-column type="index" label="#" width="50" align="center"></el-table-column>
+                            <el-table-column prop="fieldName" label="字段名" min-width="160">
+                              <template slot-scope="scope">
+                                <code style="color: #e83e8c; background-color: #f8f9fa; padding: 2px 6px; border-radius: 3px; font-size: 12px;">
+                                  {{ scope.row.fieldName }}
+                                </code>
+                              </template>
+                            </el-table-column>
+                            <el-table-column prop="fieldLabel" label="字段中文名" min-width="120"></el-table-column>
+                            <el-table-column label="作为参与计算因子" width="140" align="center">
+                              <template slot-scope="scope">
+                                <el-checkbox v-model="scope.row.isFactorField"></el-checkbox>
+                              </template>
+                            </el-table-column>
+                          </el-table>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 底部操作栏 -->
+          <div class="content-footer">
+            <el-button type="primary" @click="handleSave" size="medium">保存配置</el-button>
+            <el-button @click="handleReset" size="medium">重置</el-button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/vue@2/dist/vue.js"></script>
+  <script src="https://unpkg.com/element-ui/lib/index.js"></script>
+
+  <script>
+    new Vue({
+      el: '#app',
+      data() {
+        return {
+          searchText: '',
+          activeCategory: 'priorityCoding',
+          categories: [
+            { key: 'time', label: '时间设置', icon: 'el-icon-time' },
+            { key: 'scheduling', label: '排程设置', icon: 'el-icon-s-operation' },
+            { key: 'validity', label: '数据有效期', icon: 'el-icon-watch' },
+            { key: 'dataType', label: '数据类型', icon: 'el-icon-document' },
+            { key: 'ui', label: '界面设置', icon: 'el-icon-setting' },
+            { key: 'finance', label: '财务设置', icon: 'el-icon-coin' },
+            { key: 'priorityCoding', label: '需求优先级编码方案设置', icon: 'el-icon-s-data' }
+          ],
+          currentSource: null,
+
+          sourceTableData: [
+            { code: 'CUSTOMER', label: '客户', enabled: true },
+            { code: 'PRODUCT_STOCK_POINT', label: '库存点物品', enabled: true },
+            { code: 'DEMAND_SUMMARY', label: '需求汇总', enabled: true },
+            { code: 'SALES_SEGMENT', label: '销售部门', enabled: false }
+          ],
+
+          // 需求 VO 中的 *Id 字段（所有需求类型公共的）
+          demandIdFields: [
+            { value: 'customerId', label: 'customerId（客户ID）' },
+            { value: 'productId', label: 'productId（物料ID）' },
+            { value: 'stockPointId', label: 'stockPointId（库存点ID）' },
+            { value: 'salesSegmentId', label: 'salesSegmentId（销售部门ID）' },
+            { value: 'productSeriesId', label: 'productSeriesId（物料系列ID）' },
+            { value: 'currencyUnitId', label: 'currencyUnitId（货币单位ID）' }
+          ],
+
+          // 每个来源的关联关系配置
+          relationMap: {
+            'CUSTOMER': [
+              { demandField: 'customerId', sourceField: 'id' }
+            ],
+            'PRODUCT_STOCK_POINT': [
+              { demandField: 'productId', sourceField: 'productId' },
+              { demandField: 'stockPointId', sourceField: 'stockPointId' }
+            ],
+            'DEMAND_SUMMARY': [],
+            'SALES_SEGMENT': [
+              { demandField: 'salesSegmentId', sourceField: 'id' }
+            ]
+          },
+
+          // 每个来源的可用字段（含 *Id 字段供关联配置选择）
+          sourceIdFieldsMap: {
+            'CUSTOMER': [
+              { value: 'id', label: 'id（主键）' },
+              { value: 'currencyUnitId', label: 'currencyUnitId（货币单位ID）' }
+            ],
+            'PRODUCT_STOCK_POINT': [
+              { value: 'id', label: 'id（主键）' },
+              { value: 'productId', label: 'productId（物料ID）' },
+              { value: 'stockPointId', label: 'stockPointId（库存点ID）' },
+              { value: 'productSeriesId', label: 'productSeriesId（物料系列ID）' },
+              { value: 'countingUnitId', label: 'countingUnitId（计量单位ID）' },
+              { value: 'currencyUnitId', label: 'currencyUnitId（货币单位ID）' }
+            ],
+            'DEMAND_SUMMARY': [],
+            'SALES_SEGMENT': [
+              { value: 'id', label: 'id（主键）' },
+              { value: 'parentId', label: 'parentId（上级部门ID）' },
+              { value: 'salesLevelId', label: 'salesLevelId（销售层级ID）' }
+            ]
+          },
+
+          // 每个来源的业务字段（供参与计算因子勾选）
+          fieldDataMap: {
+            'CUSTOMER': [
+              { fieldName: 'customerCode', fieldLabel: '客户编码', isFactorField: true },
+              { fieldName: 'customerName', fieldLabel: '客户名称', isFactorField: true },
+              { fieldName: 'priority', fieldLabel: '优先级', isFactorField: false },
+              { fieldName: 'serviceLevel', fieldLabel: '服务等级', isFactorField: false },
+              { fieldName: 'contact', fieldLabel: '联系人', isFactorField: false },
+              { fieldName: 'telephone', fieldLabel: '联系电话', isFactorField: false }
+            ],
+            'PRODUCT_STOCK_POINT': [
+              { fieldName: 'productCode', fieldLabel: '物料编码', isFactorField: true },
+              { fieldName: 'productName', fieldLabel: '物料名称', isFactorField: true },
+              { fieldName: 'stockPointCode', fieldLabel: '库存点编码', isFactorField: true },
+              { fieldName: 'stockPointName', fieldLabel: '库存点名称', isFactorField: true },
+              { fieldName: 'productType', fieldLabel: '物料类型', isFactorField: true },
+              { fieldName: 'keyMaterial', fieldLabel: '关键物料', isFactorField: true },
+              { fieldName: 'longCycleMaterial', fieldLabel: '长周期物料', isFactorField: false },
+              { fieldName: 'priority', fieldLabel: '优先级', isFactorField: false },
+              { fieldName: 'allocationType', fieldLabel: '预留类型', isFactorField: false },
+              { fieldName: 'replenishmentType', fieldLabel: '补货类型', isFactorField: false },
+              { fieldName: 'calculationCategory', fieldLabel: '计算类别', isFactorField: false },
+              { fieldName: 'productSeriesCode', fieldLabel: '物料系列编码', isFactorField: true },
+              { fieldName: 'productSeriesDesc', fieldLabel: '物料系列描述', isFactorField: false },
+              { fieldName: 'expandRatio', fieldLabel: '扩展比例', isFactorField: false },
+              { fieldName: 'expandLevel', fieldLabel: '扩展等级', isFactorField: false }
+            ],
+            'DEMAND_SUMMARY': [
+              { fieldName: 'demandType', fieldLabel: '需求类型', isFactorField: true },
+              { fieldName: 'customerCode', fieldLabel: '客户编码', isFactorField: false },
+              { fieldName: 'customerName', fieldLabel: '客户名称', isFactorField: false },
+              { fieldName: 'productCode', fieldLabel: '物料编码', isFactorField: false },
+              { fieldName: 'productName', fieldLabel: '物料名称', isFactorField: false },
+              { fieldName: 'stockPointCode', fieldLabel: '库存点编码', isFactorField: false },
+              { fieldName: 'stockPointName', fieldLabel: '库存点名称', isFactorField: false },
+              { fieldName: 'salesSegmentCode', fieldLabel: '销售部门编码', isFactorField: false },
+              { fieldName: 'salesSegmentName', fieldLabel: '销售部门名称', isFactorField: false }
+            ],
+            'SALES_SEGMENT': [
+              { fieldName: 'salesSegmentCode', fieldLabel: '销售部门编码', isFactorField: true },
+              { fieldName: 'salesSegmentName', fieldLabel: '销售部门名称', isFactorField: true },
+              { fieldName: 'shortName', fieldLabel: '简称', isFactorField: true },
+              { fieldName: 'parentSalesSegmentCode', fieldLabel: '上级部门编码', isFactorField: false },
+              { fieldName: 'parentSalesSegmentName', fieldLabel: '上级部门名称', isFactorField: false },
+              { fieldName: 'salesLevelName', fieldLabel: '销售层级名称', isFactorField: false },
+              { fieldName: 'allocationRatio', fieldLabel: '分配比例', isFactorField: false }
+            ]
+          }
+        }
+      },
+      computed: {
+        currentFieldData() {
+          if (!this.currentSource) return []
+          return this.fieldDataMap[this.currentSource.code] || []
+        },
+        currentRelations() {
+          if (!this.currentSource) return []
+          return this.relationMap[this.currentSource.code] || []
+        },
+        currentSourceIdFields() {
+          if (!this.currentSource) return []
+          return this.sourceIdFieldsMap[this.currentSource.code] || []
+        }
+      },
+      methods: {
+        handleSourceChange(row) {
+          this.currentSource = row
+        },
+        handleSourceEnabledChange(row) {
+          if (!row.enabled && this.currentSource && this.currentSource.code === row.code) {
+            this.currentSource = null
+          }
+          this.$message.success(row.label + ' 已' + (row.enabled ? '启用' : '禁用'))
+        },
+        addRelation() {
+          if (!this.currentSource) return
+          var code = this.currentSource.code
+          if (!this.relationMap[code]) {
+            this.$set(this.relationMap, code, [])
+          }
+          this.relationMap[code].push({ demandField: '', sourceField: '' })
+        },
+        removeRelation(idx) {
+          if (!this.currentSource) return
+          this.relationMap[this.currentSource.code].splice(idx, 1)
+        },
+        handleSave() {
+          var config = {
+            sources: this.sourceTableData.map(function(s) {
+              return { code: s.code, enabled: s.enabled }
+            }),
+            relations: this.relationMap,
+            fields: {}
+          }
+          for (var sourceCode in this.fieldDataMap) {
+            config.fields[sourceCode] = this.fieldDataMap[sourceCode].map(function(f) {
+              return { fieldName: f.fieldName, fieldLabel: f.fieldLabel, isFactorField: f.isFactorField }
+            })
+          }
+          console.log('保存配置:', JSON.stringify(config, null, 2))
+          this.$message.success('配置保存成功')
+        },
+        handleReset() {
+          this.$confirm('确定要重置所有配置吗？', '提示', {
+            confirmButtonText: '确定',
+            cancelButtonText: '取消',
+            type: 'warning'
+          }).then(function() {
+            location.reload()
+          }).catch(function() {})
+        }
+      }
+    })
+  </script>
+</body>
+</html>

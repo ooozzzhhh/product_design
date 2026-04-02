@@ -1,0 +1,1039 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>系统全局参数 - 透视宽表报表配置</title>
+  <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; height: 100vh; overflow: hidden; background: #f5f7fa; }
+    .top-header { background: #fff; border-bottom: 1px solid #e4e7ed; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+    .header-content { display: flex; align-items: center; justify-content: space-between; padding: 8px 24px; }
+    .header-left { display: flex; align-items: center; gap: 12px; }
+    .header-icon { width: 40px; height: 40px; background: linear-gradient(135deg,#0ea5e9,#0284c7); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 18px; }
+    .header-title { font-size: 20px; font-weight: 700; color: #1e293b; }
+    .header-sub { font-size: 13px; color: #64748b; margin-top: 1px; }
+    .role-badge { display: flex; align-items: center; gap: 6px; background: #fef3c7; border: 1px solid #fcd34d; color: #92400e; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 500; }
+    .main-wrap { display: flex; height: calc(100vh - 57px); overflow: hidden; }
+    /* 左侧 */
+    .tpl-sidebar { width: 280px; background: #fff; border-right: 1px solid #e4e7ed; display: flex; flex-direction: column; flex-shrink: 0; }
+    .sidebar-header { padding: 16px; border-bottom: 1px solid #f1f5f9; }
+    .sidebar-title { font-size: 14px; font-weight: 600; color: #374151; margin-bottom: 10px; }
+    .sidebar-list { flex: 1; overflow-y: auto; padding: 8px; }
+    .tpl-item { padding: 12px; border-radius: 8px; cursor: pointer; margin-bottom: 4px; transition: all .15s; border: 1.5px solid transparent; }
+    .tpl-item:hover { background: #f8fafc; }
+    .tpl-item.active { background: #eff6ff; border-color: #3b82f6; }
+    .tpl-item-name { font-size: 14px; font-weight: 500; color: #1e293b; margin-bottom: 6px; }
+    .tpl-item.active .tpl-item-name { color: #2563eb; }
+    .tpl-item-meta { display: flex; gap: 6px; flex-wrap: wrap; }
+    .badge { display: inline-flex; align-items: center; gap: 3px; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 500; }
+    .badge-module { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
+    .badge-agg    { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+    .badge-tree   { background: #fdf4ff; color: #7e22ce; border: 1px solid #e9d5ff; }
+    .badge-info   { background: #f0f9ff; color: #0369a1; border: 1px solid #bae6fd; }
+    .badge-ok     { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
+    .sidebar-add-btn { padding: 12px; border-top: 1px solid #f1f5f9; }
+    /* 右侧 */
+    .tpl-main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    .tpl-main-header { background: #fff; border-bottom: 1px solid #e4e7ed; padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+    .tpl-main-title { display: flex; align-items: center; gap: 10px; }
+    .tpl-main-title h2 { font-size: 18px; font-weight: 600; color: #1e293b; }
+    .tab-wrap { background: #fff; border-bottom: 1px solid #e4e7ed; padding: 0 24px; flex-shrink: 0; }
+    .tab-content { flex: 1; overflow-y: auto; padding: 20px 24px; }
+    /* 卡片 */
+    .form-section { background: #fff; border: 1px solid #e4e7ed; border-radius: 8px; margin-bottom: 16px; overflow: hidden; }
+    .section-header { padding: 12px 16px; background: #f8fafc; border-bottom: 1px solid #e4e7ed; display: flex; align-items: center; justify-content: space-between; }
+    .section-title { font-size: 14px; font-weight: 600; color: #374151; display: flex; align-items: center; gap: 8px; }
+    .section-body { padding: 16px; }
+    .section-note { font-size: 12px; color: #9ca3af; margin-top: 4px; }
+    .tip-bar { padding: 8px 12px; border-radius: 6px; font-size: 12px; margin-bottom: 12px; display: flex; align-items: flex-start; gap: 8px; }
+    .tip-warn  { background: #fff7ed; border-left: 3px solid #f59e0b; color: #92400e; }
+    .tip-info  { background: #eff6ff; border-left: 3px solid #3b82f6; color: #1e40af; }
+    .tip-purple{ background: #fdf4ff; border-left: 3px solid #a855f7; color: #6b21a8; }
+    /* 数据段 */
+    .seg-row { border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 8px; overflow: hidden; }
+    .seg-row.expanded { border-color: #3b82f6; box-shadow: 0 0 0 2px #bfdbfe; }
+    .seg-row-header { display: flex; align-items: center; padding: 10px 14px; cursor: pointer; background: #fafafa; gap: 10px; }
+    .seg-row-header:hover { background: #f1f5f9; }
+    .seg-row.expanded .seg-row-header { background: #eff6ff; }
+    .seg-expand-icon { color: #9ca3af; font-size: 11px; transition: transform .2s; flex-shrink: 0; }
+    .seg-row.expanded .seg-expand-icon { transform: rotate(90deg); }
+    .seg-code  { font-family: monospace; font-size: 11px; background: #f3f4f6; padding: 2px 8px; border-radius: 4px; color: #374151; flex-shrink: 0; }
+    .seg-label { font-size: 14px; font-weight: 500; color: #1e293b; flex: 1; }
+    .seg-table { font-size: 11px; color: #6b7280; font-family: monospace; flex-shrink: 0; }
+    .seg-detail { padding: 14px; background: #fff; border-top: 1px solid #e5e7eb; }
+    .detail-label { font-size: 11px; font-weight: 600; color: #9ca3af; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 8px; }
+    .map-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .map-table th { background: #f8fafc; padding: 5px 10px; text-align: left; color: #6b7280; font-weight: 500; border: 1px solid #e5e7eb; }
+    .map-table td { padding: 5px 10px; border: 1px solid #e5e7eb; color: #374151; }
+    .map-table td code { background: #f3f4f6; padding: 1px 5px; border-radius: 3px; font-size: 11px; }
+    .cond-tag { display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px; border-radius: 4px; font-size: 11px; margin: 2px; }
+    .cond-plan    { background: #dcfce7; color: #166534; }
+    .cond-nonplan { background: #fef9c3; color: #854d0e; }
+    /* 字段 chip */
+    .field-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 8px; }
+    .field-chip { display: flex; align-items: center; padding: 8px 12px; border: 1.5px solid #e5e7eb; border-radius: 6px; gap: 8px; font-size: 13px; }
+    .field-chip.default-on { border-color: #93c5fd; background: #eff6ff; }
+    .field-chip-code { font-family: monospace; font-size: 10px; color: #9ca3af; }
+    /* 指标树 */
+    .ind-row { display: flex; align-items: center; padding: 8px 10px; border-radius: 6px; margin-bottom: 2px; }
+    .ind-row:hover { background: #f8fafc; }
+    .ind-row.parent-row { background: #f8fafc; }
+    .ind-code { font-family: monospace; font-size: 11px; background: #f3f4f6; padding: 1px 7px; border-radius: 4px; color: #374151; }
+    .ind-formula { font-size: 11px; font-family: monospace; color: #6b7280; background: #f0fdf4; padding: 1px 8px; border-radius: 4px; }
+    /* 时间轴卡片 */
+    .axis-cards { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-bottom: 14px; }
+    .axis-card { border: 2px solid #e5e7eb; border-radius: 8px; padding: 14px; cursor: pointer; transition: all .15s; }
+    .axis-card.selected { border-color: #3b82f6; background: #eff6ff; }
+    .axis-card-icon { font-size: 20px; margin-bottom: 6px; }
+    .axis-card-title { font-size: 13px; font-weight: 600; color: #1e293b; margin-bottom: 3px; }
+    .axis-card-desc { font-size: 11px; color: #6b7280; }
+    .axis-config { background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; padding: 14px; }
+    /* 通用 */
+    .empty-tip { text-align: center; padding: 32px; color: #9ca3af; font-size: 13px; }
+    .col-list-wrap { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .col-chip { font-size: 11px; font-family: monospace; background: #f3f4f6; border: 1px solid #e5e7eb; padding: 2px 8px; border-radius: 4px; color: #374151; }
+    .el-tabs__nav-wrap::after { height: 0; }
+    .el-form-item { margin-bottom: 14px; }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <!-- 顶部栏 -->
+  <div class="top-header">
+    <div class="header-content">
+      <div class="header-left">
+        <div class="header-icon"><i class="fas fa-table-columns"></i></div>
+        <div>
+          <div class="header-title">系统全局参数</div>
+          <div class="header-sub">透视宽表报表配置</div>
+        </div>
+      </div>
+      <div class="role-badge"><i class="fas fa-shield-halved"></i>实施顾问视图（可配置）</div>
+    </div>
+  </div>
+
+  <div class="main-wrap">
+    <!-- 左侧模板列表 -->
+    <div class="tpl-sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-title">报表模板列表</div>
+        <el-input size="small" placeholder="搜索模板…" prefix-icon="el-icon-search" v-model="searchText"></el-input>
+      </div>
+      <div class="sidebar-list">
+        <div v-for="tpl in filteredTemplates" :key="tpl.code"
+             class="tpl-item" :class="{active: activeTpl===tpl.code}"
+             @click="selectTpl(tpl.code)">
+          <div class="tpl-item-name">{{ tpl.name }}</div>
+          <div class="tpl-item-meta">
+            <span class="badge badge-module"><i class="fas fa-cube"></i>{{ tpl.module }}</span>
+            <span class="badge" :class="tpl.engineType==='AGGREGATION'?'badge-agg':'badge-tree'">
+              <i :class="tpl.engineType==='AGGREGATION'?'fas fa-layer-group':'fas fa-sitemap'"></i>
+              {{ tpl.engineType==='AGGREGATION'?'聚合引擎':'指标树引擎' }}
+            </span>
+            <span class="badge" :class="tpl.enabled?'badge-ok':''" style="background:#f3f4f6;color:#6b7280;border:1px solid #e5e7eb" v-if="!tpl.enabled">已禁用</span>
+          </div>
+        </div>
+      </div>
+      <div class="sidebar-add-btn">
+        <el-button size="small" icon="el-icon-plus" style="width:100%" @click="openNewTplDialog">新建报表模板</el-button>
+      </div>
+    </div>
+
+    <!-- 右侧配置区 -->
+    <div class="tpl-main" v-if="cur">
+
+      <div class="tpl-main-header">
+        <div class="tpl-main-title">
+          <h2>{{ cur.name }}</h2>
+          <span class="badge" :class="cur.engineType==='AGGREGATION'?'badge-agg':'badge-tree'" style="font-size:12px;padding:4px 10px">
+            <i :class="cur.engineType==='AGGREGATION'?'fas fa-layer-group':'fas fa-sitemap'"></i>
+            {{ cur.engineType==='AGGREGATION'?'聚合引擎':'指标树引擎' }}
+          </span>
+          <span class="badge badge-info"><i class="fas fa-circle" style="font-size:7px"></i>已启用</span>
+        </div>
+        <div style="display:flex;gap:8px">
+          <el-button size="small" @click="resetCur">重置</el-button>
+          <el-button size="small" type="primary" icon="el-icon-check" @click="saveAll">保存配置</el-button>
+        </div>
+      </div>
+
+      <div class="tab-wrap">
+        <el-tabs v-model="activeTab">
+          <el-tab-pane label="基本信息"   name="basic"></el-tab-pane>
+          <el-tab-pane :label="cur.engineType==='AGGREGATION'?'数据段':'指标定义'" name="engine"></el-tab-pane>
+          <el-tab-pane label="字段池"     name="fields"></el-tab-pane>
+          <el-tab-pane label="时间轴"     name="axis"></el-tab-pane>
+          <el-tab-pane label="筛选条件"   name="filters"></el-tab-pane>
+        </el-tabs>
+      </div>
+
+      <div class="tab-content">
+
+        <!-- ========== 基本信息 ========== -->
+        <div v-if="activeTab==='basic'">
+          <div class="form-section">
+            <div class="section-header"><span class="section-title"><i class="fas fa-info-circle"></i>模板基础信息</span></div>
+            <div class="section-body">
+              <el-form :model="cur" label-width="100px" size="small">
+                <el-row :gutter="24">
+                  <el-col :span="12">
+                    <el-form-item label="模板编码">
+                      <el-input v-model="cur.code" disabled></el-input>
+                    </el-form-item>
+                  </el-col>
+                  <el-col :span="12">
+                    <el-form-item label="模板名称">
+                      <el-input v-model="cur.name"></el-input>
+                    </el-form-item>
+                  </el-col>
+                  <el-col :span="12">
+                    <el-form-item label="所属模块">
+                      <el-select v-model="cur.module" style="width:100%">
+                        <el-option label="SDS（供应计划）" value="SDS"></el-option>
+                        <el-option label="DFP（需求计划）" value="DFP"></el-option>
+                        <el-option label="MPS（主生产计划）" value="MPS"></el-option>
+                      </el-select>
+                    </el-form-item>
+                  </el-col>
+                  <el-col :span="12">
+                    <el-form-item label="引擎类型">
+                      <el-input :value="cur.engineType==='AGGREGATION'?'聚合引擎（AGGREGATION）':'指标树引擎（INDICATOR_TREE）'" disabled></el-input>
+                      <div class="section-note">引擎类型创建时确定，不可更改</div>
+                    </el-form-item>
+                  </el-col>
+                  <el-col :span="12" v-if="cur.engineType==='INDICATOR_TREE'">
+                    <el-form-item label="分页维度">
+                      <el-select v-model="cur.pageDimension" style="width:100%">
+                        <el-option label="物品 + 库存点" value="PRODUCT_STOCK_POINT"></el-option>
+                        <el-option label="仅物品" value="PRODUCT"></el-option>
+                      </el-select>
+                    </el-form-item>
+                  </el-col>
+                  <el-col :span="12">
+                    <el-form-item label="是否启用">
+                      <el-switch v-model="cur.enabled" active-text="启用" inactive-text="禁用"></el-switch>
+                    </el-form-item>
+                  </el-col>
+                </el-row>
+              </el-form>
+            </div>
+          </div>
+          <!-- 引擎说明 -->
+          <div class="form-section">
+            <div class="section-header"><span class="section-title"><i class="fas fa-lightbulb"></i>引擎说明</span></div>
+            <div class="section-body" style="font-size:13px;color:#374151;line-height:1.8">
+              <div v-if="cur.engineType==='AGGREGATION'">
+                <p><strong>聚合引擎</strong>：多数据源 UNION ALL → GROUP BY 动态维度 → 时段聚合。通过<strong>数据段</strong>定义 UNION 来源表，通过<strong>字段池</strong>定义业务用户可选的分组维度，<strong>完全零代码新增来源</strong>。</p>
+                <p style="margin-top:8px;color:#6b7280">典型场景：供应汇总、需求汇总、库存汇总</p>
+              </div>
+              <div v-else>
+                <p><strong>指标树引擎</strong>：固定指标行树 + 跨行公式计算 + 时段透视。指标标签和顺序可在此配置；计算公式由 SDK 提供（净需求、期末等），<strong>项目升级 SDK jar 即获得更新，无需改代码</strong>。</p>
+                <p style="margin-top:8px;color:#6b7280">典型场景：供需明细汇总、供需平衡表</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ========== 数据段（聚合引擎）========== -->
+        <div v-if="activeTab==='engine' && cur.engineType==='AGGREGATION'">
+          <div class="form-section">
+            <div class="section-header">
+              <span class="section-title">
+                <i class="fas fa-database"></i>数据段配置
+                <span class="badge badge-info" style="margin-left:4px;font-size:11px">{{ cur.segments.filter(s=>s.enabled).length }}/{{ cur.segments.length }} 启用</span>
+              </span>
+              <el-button size="mini" type="primary" icon="el-icon-plus" @click="openSegDialog()">新增数据段</el-button>
+            </div>
+            <div class="section-body" style="padding:10px">
+              <div class="tip-bar tip-warn">
+                <i class="fas fa-shield-alt"></i>
+                <span>表名与字段名保存时校验白名单；用户筛选值全程 <code style="background:#fde68a;padding:1px 4px;border-radius:3px">#{}</code> 参数化，不拼入 SQL。</span>
+              </div>
+
+              <div v-for="(seg, si) in cur.segments" :key="seg.code"
+                   class="seg-row" :class="{expanded: expandedSeg===seg.code}">
+                <div class="seg-row-header" @click="toggleSeg(seg.code)">
+                  <i class="fas fa-chevron-right seg-expand-icon"></i>
+                  <span class="seg-code">{{ seg.code }}</span>
+                  <span class="seg-label">{{ seg.label }}</span>
+                  <span class="seg-table"><i class="fas fa-table" style="margin-right:3px"></i>{{ seg.tableName }}</span>
+                  <span style="display:flex;gap:3px;margin-left:8px">
+                    <span v-for="cat in seg.categoryScope" :key="cat" class="cond-tag"
+                          :class="cat==='PLAN_SUPPLY'?'cond-plan':'cond-nonplan'">
+                      {{ cat==='PLAN_SUPPLY'?'计划':'非计划' }}
+                    </span>
+                  </span>
+                  <el-switch v-model="seg.enabled" size="mini" style="margin-left:auto" @click.native.stop></el-switch>
+                </div>
+
+                <div class="seg-detail" v-if="expandedSeg===seg.code">
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+                    <div>
+                      <div class="detail-label">虚拟列 → 物理列映射</div>
+                      <table class="map-table">
+                        <thead><tr><th>虚拟列（框架标准）</th><th>物理列（表实际列名）</th></tr></thead>
+                        <tbody>
+                          <tr v-for="(phys, virt) in seg.fieldMappings" :key="virt">
+                            <td><code>{{ virt }}</code></td>
+                            <td><code>{{ phys }}</code></td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                    <div>
+                      <div class="detail-label">分类过滤条件</div>
+                      <div v-for="(conds, cat) in seg.categoryConditions" :key="cat" style="margin-bottom:8px">
+                        <span class="cond-tag" :class="cat==='PLAN_SUPPLY'?'cond-plan':'cond-nonplan'" style="margin-bottom:3px;display:inline-flex">
+                          {{ cat==='PLAN_SUPPLY'?'计划供应':'非计划供应' }}
+                        </span>
+                        <div v-if="conds && conds.length" style="font-size:12px;font-family:monospace;color:#374151;background:#f8fafc;padding:4px 8px;border-radius:4px;margin-top:3px">
+                          <div v-for="c in conds" :key="c.field">{{ c.field }} {{ c.op }} '{{ c.value }}'</div>
+                        </div>
+                        <div v-else style="font-size:11px;color:#9ca3af;padding:3px 8px">（无条件，全量参与）</div>
+                      </div>
+                    </div>
+                    <div style="grid-column:1/-1">
+                      <div class="detail-label">主数据 JOIN 配置</div>
+                      <div style="display:flex;gap:8px;flex-wrap:wrap">
+                        <div v-for="j in seg.joinConfigs" :key="j.alias"
+                             style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:6px;padding:8px 12px;font-size:12px">
+                          <span style="font-weight:600;color:#374151">LEFT JOIN <code style="background:#f3f4f6;padding:1px 4px;border-radius:3px">{{ j.table }}</code> AS {{ j.alias }}</span><br>
+                          <span style="color:#6b7280;font-family:monospace;font-size:11px">ON {{ j.on }}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div style="margin-top:12px;display:flex;justify-content:flex-end;gap:8px;border-top:1px solid #f1f5f9;padding-top:10px">
+                    <el-button size="mini" icon="el-icon-edit" @click.stop="openSegDialog(seg)">编辑</el-button>
+                    <el-button size="mini" icon="el-icon-delete" type="danger" plain @click.stop="deleteSeg(si)">删除</el-button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ========== 指标定义（指标树引擎）========== -->
+        <div v-if="activeTab==='engine' && cur.engineType==='INDICATOR_TREE'">
+          <div class="form-section">
+            <div class="section-header">
+              <span class="section-title"><i class="fas fa-sitemap"></i>指标树定义</span>
+              <div style="display:flex;gap:8px;align-items:center">
+                <span style="font-size:11px;color:#9ca3af"><i class="fas fa-lock"></i> 公式由 SDK 实现，升级 jar 获得更新</span>
+              </div>
+            </div>
+            <div class="section-body" style="padding:10px">
+              <div class="tip-bar tip-purple"><i class="fas fa-flask"></i><span>指标名称和顺序可直接编辑；formula_bean 对应 SDK 中的 Spring Bean，不可在此更改。</span></div>
+              <!-- 列头 -->
+              <div style="display:flex;padding:5px 10px;font-size:11px;font-weight:600;color:#9ca3af;border-bottom:1px solid #f1f5f9;margin-bottom:4px;gap:8px">
+                <div style="flex:0 0 20px"></div>
+                <div style="flex:0 0 190px">指标编码</div>
+                <div style="flex:1">指标名称（可编辑）</div>
+                <div style="flex:0 0 180px">公式 Bean</div>
+                <div style="flex:0 0 90px;text-align:center">排序</div>
+                <div style="flex:0 0 55px;text-align:center">启用</div>
+              </div>
+              <div v-for="(ind, idx) in cur.indicators" :key="ind.code" class="ind-row" :class="{'parent-row':!ind.parentCode}" style="gap:8px">
+                <div style="flex:0 0 20px;color:#9ca3af;font-size:10px">
+                  <i v-if="!ind.parentCode" class="fas fa-layer-group"></i>
+                  <i v-else class="fas fa-corner-down-right" style="margin-left:6px"></i>
+                </div>
+                <div style="flex:0 0 190px">
+                  <span class="ind-code" :style="ind.parentCode?'background:#faf5ff;color:#7c3aed':''">{{ ind.code }}</span>
+                </div>
+                <div style="flex:1">
+                  <el-input v-if="editingIndCode===ind.code" v-model="ind.name" size="mini"
+                    @blur="editingIndCode=null" @keyup.enter.native="editingIndCode=null"
+                    style="width:180px" ref="indNameInput"></el-input>
+                  <span v-else @dblclick="startEditInd(ind.code)"
+                    :style="(ind.parentCode?'margin-left:16px;font-size:12px;color:#6b7280':'font-size:13px;font-weight:500;color:#1e293b')+';cursor:text'"
+                    :title="'双击编辑'">{{ ind.name }}</span>
+                </div>
+                <div style="flex:0 0 180px">
+                  <span class="ind-formula">{{ ind.formulaBean }}</span>
+                </div>
+                <div style="flex:0 0 90px;display:flex;align-items:center;justify-content:center;gap:2px">
+                  <el-button type="text" size="mini" icon="el-icon-top"    @click="moveInd(idx,-1)" :disabled="idx===0"></el-button>
+                  <el-button type="text" size="mini" icon="el-icon-bottom" @click="moveInd(idx,1)"  :disabled="idx===cur.indicators.length-1"></el-button>
+                  <span style="font-size:11px;color:#9ca3af;min-width:22px;text-align:center">{{ ind.order }}</span>
+                </div>
+                <div style="flex:0 0 55px;text-align:center">
+                  <el-switch v-model="ind.enabled" size="mini"></el-switch>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- DataProvider 说明 -->
+          <div class="form-section">
+            <div class="section-header"><span class="section-title"><i class="fas fa-plug"></i>数据提供者</span></div>
+            <div class="section-body">
+              <el-form label-width="130px" size="small">
+                <el-form-item label="Provider Bean">
+                  <el-input value="supplyDemandDataProvider" disabled style="width:280px"></el-input>
+                  <div class="section-note">SDK 中实现了 IndicatorDataProvider 接口的 Bean，负责加载需求与供应原始数据</div>
+                </el-form-item>
+              </el-form>
+              <div class="tip-bar tip-info" style="margin-top:0">
+                <i class="fas fa-info-circle"></i>
+                <span>若需新增公式类指标（如新的计算逻辑），请联系产品团队升级 SDK；项目直接升级 jar，数据库配置不变。</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ========== 字段池 ========== -->
+        <div v-if="activeTab==='fields'">
+          <div class="form-section">
+            <div class="section-header">
+              <span class="section-title"><i class="fas fa-bars"></i>维度字段（行区域）</span>
+              <el-button v-if="cur.engineType==='AGGREGATION'" size="mini" type="primary" icon="el-icon-plus" @click="openDimDialog()">新增维度</el-button>
+            </div>
+            <div class="section-body">
+              <div v-if="cur.engineType==='AGGREGATION'">
+                <div class="tip-bar tip-info"><i class="fas fa-info-circle"></i><span>字段须在所有数据段的字段映射中存在。勾选「默认选中」则业务用户打开报表时自动选中该维度。</span></div>
+                <div class="field-grid">
+                  <div v-for="(f, fi) in cur.dimensionFields" :key="f.code"
+                       class="field-chip" :class="{'default-on': f.isDefault}">
+                    <el-checkbox v-model="f.isDefault" title="默认选中"></el-checkbox>
+                    <div style="flex:1">
+                      <div style="font-size:13px;color:#1e293b">{{ f.name }}</div>
+                      <div class="field-chip-code">{{ f.code }}<el-tag v-if="f.enumClass" size="mini" type="success" style="margin-left:6px;font-size:10px">枚举</el-tag></div>
+                    </div>
+                    <el-button type="text" size="mini" icon="el-icon-edit"   style="padding:0;color:#6b7280" @click="openDimDialog(f, fi)"></el-button>
+                    <el-button type="text" size="mini" icon="el-icon-delete" style="padding:0;color:#ef4444" @click="deleteDim(fi)"></el-button>
+                  </div>
+                </div>
+              </div>
+              <div v-else class="empty-tip" style="padding:16px">
+                <i class="fas fa-info-circle" style="color:#9ca3af"></i>
+                <p style="margin-top:6px">指标树引擎的行由「指标定义」决定，不使用维度字段池。</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-section" v-if="cur.engineType==='AGGREGATION'">
+            <div class="section-header">
+              <span class="section-title"><i class="fas fa-calculator"></i>度量字段（值区域）</span>
+              <el-button size="mini" icon="el-icon-plus" @click="openMeasureDialog()">新增度量</el-button>
+            </div>
+            <div class="section-body">
+              <el-table :data="cur.measureFields" size="small" border>
+                <el-table-column label="字段编码" width="180">
+                  <template slot-scope="{row}"><code style="font-size:12px">{{ row.code }}</code></template>
+                </el-table-column>
+                <el-table-column label="字段名称" prop="name" width="140"></el-table-column>
+                <el-table-column label="聚合函数" width="160">
+                  <template slot-scope="{row}">
+                    <el-select v-model="row.aggFunction" size="mini" style="width:130px">
+                      <el-option value="SUM" label="SUM（求和）"></el-option>
+                      <el-option value="COUNT" label="COUNT（计数）"></el-option>
+                      <el-option value="AVG" label="AVG（均值）"></el-option>
+                      <el-option value="MAX" label="MAX（最大值）"></el-option>
+                    </el-select>
+                  </template>
+                </el-table-column>
+                <el-table-column label="操作" width="100" align="center">
+                  <template slot-scope="{$index}">
+                    <el-button type="text" size="mini" style="color:#ef4444" @click="deleteMeasure($index)">删除</el-button>
+                  </template>
+                </el-table-column>
+              </el-table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ========== 时间轴 ========== -->
+        <div v-if="activeTab==='axis'">
+          <div class="form-section">
+            <div class="section-header"><span class="section-title"><i class="fas fa-calendar-days"></i>列区域（时间轴来源）</span></div>
+            <div class="section-body">
+              <div class="axis-cards">
+                <div class="axis-card" :class="{selected: cur.columnAxisType==='MDS_FEIGN'}" @click="cur.columnAxisType='MDS_FEIGN'">
+                  <div class="axis-card-icon">🔗</div>
+                  <div class="axis-card-title">MDS Feign 接口</div>
+                  <div class="axis-card-desc">调用 MDS 主数据服务获取已配置的时段组</div>
+                </div>
+                <div class="axis-card" :class="{selected: cur.columnAxisType==='NATURAL_MONTH'}" @click="cur.columnAxisType='NATURAL_MONTH'">
+                  <div class="axis-card-icon">📅</div>
+                  <div class="axis-card-title">自然月</div>
+                  <div class="axis-card-desc">按自然月生成时段列，不依赖 MDS 时段组</div>
+                </div>
+                <div class="axis-card" :class="{selected: cur.columnAxisType==='DB_TABLE'}" @click="cur.columnAxisType='DB_TABLE'">
+                  <div class="axis-card-icon">🗃️</div>
+                  <div class="axis-card-title">数据库时段表</div>
+                  <div class="axis-card-desc">从自定义数据库表读取时段定义</div>
+                </div>
+              </div>
+              <div class="axis-config">
+                <div v-if="cur.columnAxisType==='MDS_FEIGN'">
+                  <el-form label-width="130px" size="small">
+                    <el-form-item label="Feign Bean 名称"><el-input v-model="cur.axisConfig.feignBean" style="width:220px"></el-input></el-form-item>
+                    <el-form-item label="接口方法"><el-input v-model="cur.axisConfig.feignMethod" style="width:220px"></el-input></el-form-item>
+                    <el-form-item label="时段类型参数">
+                      <el-select v-model="cur.axisConfig.timePeriodType" style="width:280px">
+                        <el-option value="LIMITED_CAPACITY_COMPUTING" label="LIMITED_CAPACITY_COMPUTING"></el-option>
+                        <el-option value="MPS" label="MPS"></el-option>
+                      </el-select>
+                    </el-form-item>
+                    <el-form-item label="periodEnd 处理">
+                      <el-radio-group v-model="cur.axisConfig.periodEndMode">
+                        <el-radio label="END_OF_DAY">调整为当天 23:59:59（推荐）</el-radio>
+                        <el-radio label="RAW">原始值</el-radio>
+                      </el-radio-group>
+                    </el-form-item>
+                  </el-form>
+                </div>
+                <div v-if="cur.columnAxisType==='NATURAL_MONTH'">
+                  <el-form label-width="130px" size="small">
+                    <el-form-item label="展望月数">
+                      <el-input-number v-model="cur.axisConfig.months" :min="1" :max="60" size="small" style="width:120px"></el-input-number>
+                      <span style="margin-left:8px;font-size:12px;color:#6b7280">个月</span>
+                    </el-form-item>
+                  </el-form>
+                </div>
+                <div v-if="cur.columnAxisType==='DB_TABLE'">
+                  <el-form label-width="130px" size="small">
+                    <el-form-item label="时段表名"><el-input v-model="cur.axisConfig.tableName" style="width:260px" placeholder="如 sys_time_period"></el-input></el-form-item>
+                    <el-form-item label="起始时间列"><el-input v-model="cur.axisConfig.startCol" style="width:160px" placeholder="period_start"></el-input></el-form-item>
+                    <el-form-item label="结束时间列"><el-input v-model="cur.axisConfig.endCol"   style="width:160px" placeholder="period_end"></el-input></el-form-item>
+                  </el-form>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ========== 筛选条件 ========== -->
+        <div v-if="activeTab==='filters'">
+          <div class="form-section">
+            <div class="section-header">
+              <span class="section-title"><i class="fas fa-filter"></i>筛选字段（业务用户可填写的过滤条件）</span>
+              <el-button size="mini" type="primary" icon="el-icon-plus" @click="openFilterDialog()">新增筛选字段</el-button>
+            </div>
+            <div class="section-body">
+              <el-table :data="cur.filterFields" size="small" border>
+                <el-table-column label="字段编码" width="160">
+                  <template slot-scope="{row}"><code style="font-size:12px">{{ row.code }}</code></template>
+                </el-table-column>
+                <el-table-column label="字段名称" prop="name" width="120"></el-table-column>
+                <el-table-column label="类型" width="90">
+                  <template slot-scope="{row}">
+                    <el-tag size="mini" :type="row.fieldType==='ENUM'?'':row.fieldType==='DATE'?'success':'info'">{{ row.fieldType }}</el-tag>
+                  </template>
+                </el-table-column>
+                <el-table-column label="枚举类" min-width="200">
+                  <template slot-scope="{row}">
+                    <span style="font-size:11px;font-family:monospace;color:#6b7280" v-if="row.enumClass">{{ row.enumClass }}</span>
+                    <span style="color:#d1d5db" v-else>—</span>
+                  </template>
+                </el-table-column>
+                <el-table-column label="必填" width="60" align="center">
+                  <template slot-scope="{row}"><el-switch v-model="row.required" size="mini"></el-switch></template>
+                </el-table-column>
+                <el-table-column label="操作" width="100" align="center">
+                  <template slot-scope="{row, $index}">
+                    <el-button type="text" size="mini" @click="openFilterDialog(row, $index)">编辑</el-button>
+                    <el-button type="text" size="mini" style="color:#ef4444" @click="deleteFilter($index)">删除</el-button>
+                  </template>
+                </el-table-column>
+              </el-table>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /tab-content -->
+    </div><!-- /tpl-main -->
+
+    <div class="tpl-main" v-else style="align-items:center;justify-content:center">
+      <div class="empty-tip"><i class="fas fa-table-columns" style="font-size:32px"></i><p style="margin-top:10px">请从左侧选择报表模板</p></div>
+    </div>
+  </div><!-- /main-wrap -->
+
+  <!-- ============ 数据段 Dialog ============ -->
+  <el-dialog :title="segMode==='add'?'新增数据段':'编辑数据段'" :visible.sync="segDialogVisible" width="680px" @close="resetSegForm">
+    <el-form :model="segForm" label-width="110px" size="small" ref="segFormRef">
+      <el-row :gutter="16">
+        <el-col :span="12">
+          <el-form-item label="段编码" prop="code" :rules="[{required:true,message:'请填写段编码'}]">
+            <el-input v-model="segForm.code" :disabled="segMode==='edit'" placeholder="大写+下划线，如 CUSTOM_SUPPLY"></el-input>
+          </el-form-item>
+        </el-col>
+        <el-col :span="12">
+          <el-form-item label="段名称" prop="label" :rules="[{required:true,message:'请填写段名称'}]">
+            <el-input v-model="segForm.label" placeholder="如 自定义供应"></el-input>
+          </el-form-item>
+        </el-col>
+      </el-row>
+      <el-form-item label="来源表名" prop="tableName" :rules="[{required:true,message:'请填写表名'}]">
+        <div style="display:flex;gap:8px;align-items:center">
+          <el-input v-model="segForm.tableName" style="width:260px" placeholder="如 sds_supply_custom" @input="detectedColumns=[]"></el-input>
+          <el-button size="mini" icon="el-icon-search" @click="detectColumns" :loading="detecting">探测列</el-button>
+        </div>
+        <div v-if="detectedColumns.length" class="col-list-wrap">
+          <span v-for="c in detectedColumns" :key="c" class="col-chip">{{ c }}</span>
+        </div>
+        <div class="section-note">探测列会读取 information_schema，自动辅助填充字段映射</div>
+      </el-form-item>
+      <el-form-item label="参与分类">
+        <el-checkbox-group v-model="segForm.categoryScope">
+          <el-checkbox label="PLAN_SUPPLY">计划供应</el-checkbox>
+          <el-checkbox label="NON_PLAN_SUPPLY">非计划供应</el-checkbox>
+        </el-checkbox-group>
+      </el-form-item>
+      <!-- 分类过滤条件 -->
+      <div v-for="cat in segForm.categoryScope" :key="cat" style="margin-bottom:10px">
+        <el-form-item :label="cat==='PLAN_SUPPLY'?'计划供应条件':'非计划条件'">
+          <div v-for="(cond, ci) in segForm.categoryConditions[cat]" :key="ci"
+               style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
+            <el-input v-model="cond.field" placeholder="字段名" style="width:120px" size="mini"></el-input>
+            <el-select v-model="cond.op" style="width:65px" size="mini">
+              <el-option value="=" label="="></el-option>
+              <el-option value="!=" label="!="></el-option>
+              <el-option value="IN" label="IN"></el-option>
+            </el-select>
+            <el-input v-model="cond.value" placeholder="值" style="width:100px" size="mini"></el-input>
+            <el-button size="mini" type="danger" plain icon="el-icon-minus" circle @click="removeCond(cat, ci)"></el-button>
+          </div>
+          <el-button size="mini" icon="el-icon-plus" @click="addCond(cat)">添加条件</el-button>
+          <span style="font-size:11px;color:#9ca3af;margin-left:8px">不填则该分类下全量参与</span>
+        </el-form-item>
+      </div>
+      <!-- 字段映射 -->
+      <el-form-item label="字段映射">
+        <table class="map-table" style="margin-bottom:6px">
+          <thead><tr><th>虚拟列（框架标准）</th><th>物理列（来源表实际列名）</th></tr></thead>
+          <tbody>
+            <tr v-for="(m, mi) in segForm.fieldMappings" :key="mi">
+              <td><el-input v-model="m.virtualCol" size="mini" style="width:150px"></el-input></td>
+              <td style="display:flex;gap:4px;align-items:center">
+                <el-input v-model="m.physicalCol" size="mini" style="width:150px"></el-input>
+                <el-button size="mini" type="danger" plain icon="el-icon-close" circle @click="segForm.fieldMappings.splice(mi,1)"></el-button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <el-button size="mini" icon="el-icon-plus" @click="segForm.fieldMappings.push({virtualCol:'',physicalCol:''})">添加映射行</el-button>
+        <div class="section-note">列名相同可不填（框架自动对齐）</div>
+      </el-form-item>
+    </el-form>
+    <span slot="footer">
+      <el-button size="small" @click="segDialogVisible=false">取消</el-button>
+      <el-button size="small" type="primary" @click="saveSeg">保存数据段</el-button>
+    </span>
+  </el-dialog>
+
+  <!-- ============ 维度字段 Dialog ============ -->
+  <el-dialog :title="dimMode==='add'?'新增维度字段':'编辑维度字段'" :visible.sync="dimDialogVisible" width="460px">
+    <el-form :model="dimForm" label-width="110px" size="small">
+      <el-form-item label="字段编码"><el-input v-model="dimForm.code" placeholder="如 warehouse_code" :disabled="dimMode==='edit'"></el-input></el-form-item>
+      <el-form-item label="字段名称"><el-input v-model="dimForm.name" placeholder="如 仓库编码"></el-input></el-form-item>
+      <el-form-item label="默认选中"><el-switch v-model="dimForm.isDefault" active-text="是" inactive-text="否"></el-switch></el-form-item>
+      <el-form-item label="枚举类">
+        <el-input v-model="dimForm.enumClass" placeholder="如 com.yhl.scp.enums.XxxEnum（有枚举时填）"></el-input>
+        <div class="section-note">填写后框架自动将 code 翻译为 label 展示</div>
+      </el-form-item>
+    </el-form>
+    <span slot="footer">
+      <el-button size="small" @click="dimDialogVisible=false">取消</el-button>
+      <el-button size="small" type="primary" @click="saveDim">保存</el-button>
+    </span>
+  </el-dialog>
+
+  <!-- ============ 度量字段 Dialog ============ -->
+  <el-dialog title="新增度量字段" :visible.sync="measureDialogVisible" width="420px">
+    <el-form :model="measureForm" label-width="110px" size="small">
+      <el-form-item label="字段编码"><el-input v-model="measureForm.code" placeholder="如 weight"></el-input></el-form-item>
+      <el-form-item label="字段名称"><el-input v-model="measureForm.name" placeholder="如 重量"></el-input></el-form-item>
+      <el-form-item label="聚合函数">
+        <el-select v-model="measureForm.aggFunction" style="width:160px">
+          <el-option value="SUM" label="SUM（求和）"></el-option>
+          <el-option value="COUNT" label="COUNT（计数）"></el-option>
+          <el-option value="AVG" label="AVG（均值）"></el-option>
+          <el-option value="MAX" label="MAX（最大值）"></el-option>
+        </el-select>
+      </el-form-item>
+    </el-form>
+    <span slot="footer">
+      <el-button size="small" @click="measureDialogVisible=false">取消</el-button>
+      <el-button size="small" type="primary" @click="saveMeasure">保存</el-button>
+    </span>
+  </el-dialog>
+
+  <!-- ============ 筛选字段 Dialog ============ -->
+  <el-dialog :title="filterMode==='add'?'新增筛选字段':'编辑筛选字段'" :visible.sync="filterDialogVisible" width="460px">
+    <el-form :model="filterForm" label-width="110px" size="small">
+      <el-form-item label="字段编码"><el-input v-model="filterForm.code" :disabled="filterMode==='edit'" placeholder="如 warehouseId"></el-input></el-form-item>
+      <el-form-item label="字段名称"><el-input v-model="filterForm.name" placeholder="如 仓库"></el-input></el-form-item>
+      <el-form-item label="字段类型">
+        <el-select v-model="filterForm.fieldType" style="width:160px">
+          <el-option value="ENUM" label="ENUM（下拉枚举）"></el-option>
+          <el-option value="TEXT" label="TEXT（文本输入）"></el-option>
+          <el-option value="DATE" label="DATE（日期选择）"></el-option>
+          <el-option value="NUMBER" label="NUMBER（数字输入）"></el-option>
+        </el-select>
+      </el-form-item>
+      <el-form-item label="枚举类" v-if="filterForm.fieldType==='ENUM'">
+        <el-input v-model="filterForm.enumClass" placeholder="如 com.yhl.scp.enums.XxxEnum"></el-input>
+      </el-form-item>
+      <el-form-item label="是否必填">
+        <el-switch v-model="filterForm.required" active-text="必填" inactive-text="可选"></el-switch>
+      </el-form-item>
+    </el-form>
+    <span slot="footer">
+      <el-button size="small" @click="filterDialogVisible=false">取消</el-button>
+      <el-button size="small" type="primary" @click="saveFilter">保存</el-button>
+    </span>
+  </el-dialog>
+
+  <!-- ============ 新建模板 Dialog ============ -->
+  <el-dialog title="新建报表模板" :visible.sync="newTplDialogVisible" width="460px">
+    <el-form :model="newTplForm" label-width="110px" size="small">
+      <el-form-item label="模板编码"><el-input v-model="newTplForm.code" placeholder="大写+下划线，如 CUSTOM_REPORT"></el-input></el-form-item>
+      <el-form-item label="模板名称"><el-input v-model="newTplForm.name" placeholder="如 自定义供应报表"></el-input></el-form-item>
+      <el-form-item label="所属模块">
+        <el-select v-model="newTplForm.module" style="width:200px">
+          <el-option label="SDS（供应计划）" value="SDS"></el-option>
+          <el-option label="DFP（需求计划）" value="DFP"></el-option>
+          <el-option label="MPS（主生产计划）" value="MPS"></el-option>
+        </el-select>
+      </el-form-item>
+      <el-form-item label="引擎类型">
+        <el-radio-group v-model="newTplForm.engineType">
+          <el-radio label="AGGREGATION">聚合引擎（UNION + GROUP BY）</el-radio>
+          <el-radio label="INDICATOR_TREE">指标树引擎（固定行 + 公式）</el-radio>
+        </el-radio-group>
+        <div class="section-note" style="margin-top:6px">{{ newTplForm.engineType==='AGGREGATION'?'适合：供应汇总、需求汇总类报表':'适合：供需明细、供需平衡类报表' }}</div>
+      </el-form-item>
+    </el-form>
+    <span slot="footer">
+      <el-button size="small" @click="newTplDialogVisible=false">取消</el-button>
+      <el-button size="small" type="primary" @click="createTpl">创建</el-button>
+    </span>
+  </el-dialog>
+
+</div><!-- /#app -->
+
+<script src="https://unpkg.com/vue@2/dist/vue.js"></script>
+<script src="https://unpkg.com/element-ui/lib/index.js"></script>
+<script>
+const MOCK_COLUMNS = {
+  'sds_ord_purchase_order':        ['id','item_code','item_name','stock_point_code','supply_date','quantity','order_flag','order_no','unit','version_id'],
+  'sds_ord_work_order':            ['id','item_code','item_name','stock_point_code','supply_date','quantity','order_flag','work_order_no','bom_version'],
+  'sds_ord_transport_order':       ['id','item_code','stock_point_code','supply_date','quantity','order_flag','transport_no','from_stock_point'],
+  'sds_sup_boh_stock':             ['id','item_code','stock_point_code','available_date','quantity','version_id','status'],
+  'sds_sup_purchase_forecast_stock':['id','item_code','stock_point_code','supply_date','quantity','source','forecast_no'],
+  'sds_supply_universal':          ['id','item_code','stock_point_code','supply_date','quantity','supply_type','remark'],
+};
+const DEFAULT_MAPPINGS = [
+  {virtualCol:'item_code',        physicalCol:'item_code'},
+  {virtualCol:'stock_point_code', physicalCol:'stock_point_code'},
+  {virtualCol:'supply_date',      physicalCol:'supply_date'},
+  {virtualCol:'quantity',         physicalCol:'quantity'},
+];
+
+new Vue({
+  el: '#app',
+  data() {
+    return {
+      searchText: '',
+      activeTpl: 'SUPPLY_SUMMARY',
+      activeTab: 'engine',
+      expandedSeg: 'PURCHASE_ORDER',
+      editingIndCode: null,
+      // 数据段 dialog
+      segDialogVisible: false,
+      segMode: 'add',
+      editingSegIndex: -1,
+      detecting: false,
+      detectedColumns: [],
+      segForm: { code:'', label:'', tableName:'', categoryScope:[], categoryConditions:{PLAN_SUPPLY:[],NON_PLAN_SUPPLY:[]}, fieldMappings: JSON.parse(JSON.stringify(DEFAULT_MAPPINGS)), joinConfigs:[] },
+      // 维度 dialog
+      dimDialogVisible: false,
+      dimMode: 'add',
+      editingDimIndex: -1,
+      dimForm: { code:'', name:'', isDefault:false, enumClass:'' },
+      // 度量 dialog
+      measureDialogVisible: false,
+      measureForm: { code:'', name:'', aggFunction:'SUM' },
+      // 筛选 dialog
+      filterDialogVisible: false,
+      filterMode: 'add',
+      editingFilterIndex: -1,
+      filterForm: { code:'', name:'', fieldType:'TEXT', enumClass:'', required:false },
+      // 新建模板 dialog
+      newTplDialogVisible: false,
+      newTplForm: { code:'', name:'', module:'SDS', engineType:'AGGREGATION' },
+
+      templates: [
+        { code:'SUPPLY_SUMMARY',       name:'供应汇总',     module:'SDS', engineType:'AGGREGATION',    enabled:true },
+        { code:'SUPPLY_DEMAND_SUMMARY',name:'供需明细汇总', module:'SDS', engineType:'INDICATOR_TREE', enabled:true },
+      ],
+      tplData: {
+        SUPPLY_SUMMARY: {
+          code:'SUPPLY_SUMMARY', name:'供应汇总', module:'SDS',
+          engineType:'AGGREGATION', enabled:true,
+          columnAxisType:'MDS_FEIGN',
+          axisConfig:{ feignBean:'mdsFeign', feignMethod:'getDefaultTimePeriods', timePeriodType:'LIMITED_CAPACITY_COMPUTING', periodEndMode:'END_OF_DAY', months:12 },
+          segments:[
+            { code:'PURCHASE_ORDER', label:'采购订单', tableName:'sds_ord_purchase_order', enabled:true,
+              categoryScope:['PLAN_SUPPLY'],
+              fieldMappings:{item_code:'item_code',stock_point_code:'stock_point_code',supply_date:'supply_date',quantity:'quantity'},
+              categoryConditions:{PLAN_SUPPLY:[{field:'order_flag',op:'=',value:'NO'}]},
+              joinConfigs:[{table:'mds_pro_product_base',alias:'pb',on:'s.item_id = pb.id'},{table:'mds_pro_stock_point',alias:'sp',on:'s.stock_point_id = sp.id'},{table:'mds_pro_product_series',alias:'ps',on:'pb.series_id = ps.id'}]},
+            { code:'WORK_ORDER', label:'制造订单', tableName:'sds_ord_work_order', enabled:true,
+              categoryScope:['PLAN_SUPPLY','NON_PLAN_SUPPLY'],
+              fieldMappings:{item_code:'item_code',stock_point_code:'stock_point_code',supply_date:'supply_date',quantity:'quantity'},
+              categoryConditions:{PLAN_SUPPLY:[{field:'order_flag',op:'=',value:'NO'}],NON_PLAN_SUPPLY:[{field:'order_flag',op:'=',value:'YES'}]},
+              joinConfigs:[{table:'mds_pro_product_base',alias:'pb',on:'s.item_id = pb.id'},{table:'mds_pro_stock_point',alias:'sp',on:'s.stock_point_id = sp.id'},{table:'mds_pro_product_series',alias:'ps',on:'pb.series_id = ps.id'}]},
+            { code:'TRANSPORT_ORDER', label:'运输订单', tableName:'sds_ord_transport_order', enabled:true,
+              categoryScope:['PLAN_SUPPLY','NON_PLAN_SUPPLY'],
+              fieldMappings:{item_code:'item_code',stock_point_code:'stock_point_code',supply_date:'supply_date',quantity:'quantity'},
+              categoryConditions:{PLAN_SUPPLY:[{field:'order_flag',op:'=',value:'NO'}],NON_PLAN_SUPPLY:[{field:'order_flag',op:'=',value:'YES'}]},
+              joinConfigs:[{table:'mds_pro_product_base',alias:'pb',on:'s.item_id = pb.id'},{table:'mds_pro_stock_point',alias:'sp',on:'s.stock_point_id = sp.id'},{table:'mds_pro_product_series',alias:'ps',on:'pb.series_id = ps.id'}]},
+            { code:'BOH_STOCK', label:'期初库存', tableName:'sds_sup_boh_stock', enabled:true,
+              categoryScope:['NON_PLAN_SUPPLY'],
+              fieldMappings:{item_code:'item_code',stock_point_code:'stock_point_code',supply_date:'available_date',quantity:'quantity'},
+              categoryConditions:{NON_PLAN_SUPPLY:[]},
+              joinConfigs:[{table:'mds_pro_product_base',alias:'pb',on:'s.item_id = pb.id'},{table:'mds_pro_stock_point',alias:'sp',on:'s.stock_point_id = sp.id'}]},
+            { code:'PURCHASE_FORECAST', label:'采购在途', tableName:'sds_sup_purchase_forecast_stock', enabled:true,
+              categoryScope:['NON_PLAN_SUPPLY'],
+              fieldMappings:{item_code:'item_code',stock_point_code:'stock_point_code',supply_date:'supply_date',quantity:'quantity'},
+              categoryConditions:{NON_PLAN_SUPPLY:[]},
+              joinConfigs:[{table:'mds_pro_product_base',alias:'pb',on:'s.item_id = pb.id'},{table:'mds_pro_stock_point',alias:'sp',on:'s.stock_point_id = sp.id'}]},
+            { code:'UNIVERSAL', label:'通用供应', tableName:'sds_supply_universal', enabled:true,
+              categoryScope:['PLAN_SUPPLY','NON_PLAN_SUPPLY'],
+              fieldMappings:{item_code:'item_code',stock_point_code:'stock_point_code',supply_date:'supply_date',quantity:'quantity'},
+              categoryConditions:{PLAN_SUPPLY:[],NON_PLAN_SUPPLY:[]},
+              joinConfigs:[{table:'mds_pro_product_base',alias:'pb',on:'s.item_id = pb.id'},{table:'mds_pro_stock_point',alias:'sp',on:'s.stock_point_id = sp.id'}]},
+          ],
+          dimensionFields:[
+            {code:'item_code',        name:'物品编码',     isDefault:true,  enumClass:''},
+            {code:'item_name',        name:'物品名称',     isDefault:true,  enumClass:''},
+            {code:'item_type',        name:'物品类型',     isDefault:false, enumClass:'com.yhl.scp.mds.enums.ItemTypeEnum'},
+            {code:'stock_point_code', name:'库存点编码',   isDefault:true,  enumClass:''},
+            {code:'stock_point_name', name:'库存点名称',   isDefault:false, enumClass:''},
+            {code:'series_code',      name:'物品系列编码', isDefault:false, enumClass:''},
+            {code:'series_name',      name:'物品系列名称', isDefault:false, enumClass:''},
+            {code:'supply_type',      name:'供应子类型',   isDefault:false, enumClass:'com.yhl.scp.sds.enums.SupplyTypeEnum'},
+          ],
+          measureFields:[{code:'quantity', name:'供应数量', aggFunction:'SUM'}],
+          filterFields:[
+            {code:'supplyVersionId', name:'供应版本', fieldType:'TEXT',  enumClass:'',                                            required:false},
+            {code:'supplyCategory',  name:'供应分类', fieldType:'ENUM',  enumClass:'com.yhl.scp.sds.enums.SupplyCategoryEnum',    required:false},
+          ],
+        },
+        SUPPLY_DEMAND_SUMMARY: {
+          code:'SUPPLY_DEMAND_SUMMARY', name:'供需明细汇总', module:'SDS',
+          engineType:'INDICATOR_TREE', enabled:true,
+          columnAxisType:'MDS_FEIGN', pageDimension:'PRODUCT_STOCK_POINT',
+          axisConfig:{ feignBean:'mdsFeign', feignMethod:'getDefaultTimePeriods', timePeriodType:'LIMITED_CAPACITY_COMPUTING', periodEndMode:'END_OF_DAY', months:12 },
+          indicators:[
+            {code:'BEGINNING_STOCK', name:'期初库存',   parentCode:null,             formulaBean:'beginningStockFormula', order:1,  enabled:true},
+            {code:'GROSS_DEMAND',    name:'毛需求',     parentCode:null,             formulaBean:'grossDemandFormula',    order:2,  enabled:true},
+            {code:'CUSTOMER_ORDER',  name:'客户订单需求',parentCode:'GROSS_DEMAND',  formulaBean:'customerOrderFormula',  order:3,  enabled:true},
+            {code:'FORECAST',        name:'预测需求',   parentCode:'GROSS_DEMAND',   formulaBean:'forecastDemandFormula', order:4,  enabled:true},
+            {code:'MO_DEMAND',       name:'制造订单需求',parentCode:'GROSS_DEMAND',  formulaBean:'moDemandFormula',       order:5,  enabled:true},
+            {code:'NON_PLAN_SUPPLY', name:'非计划供应', parentCode:null,             formulaBean:'nonPlanSupplyFormula',  order:6,  enabled:true},
+            {code:'NP_PURCHASE',     name:'采购订单',   parentCode:'NON_PLAN_SUPPLY',formulaBean:'npPurchaseFormula',     order:7,  enabled:true},
+            {code:'NP_WORK',         name:'制造订单',   parentCode:'NON_PLAN_SUPPLY',formulaBean:'npWorkFormula',         order:8,  enabled:true},
+            {code:'NP_TRANSPORT',    name:'运输订单',   parentCode:'NON_PLAN_SUPPLY',formulaBean:'npTransportFormula',    order:9,  enabled:true},
+            {code:'NET_DEMAND',      name:'净需求',     parentCode:null,             formulaBean:'netDemandFormula',      order:10, enabled:true},
+            {code:'PLAN_SUPPLY',     name:'计划供应',   parentCode:null,             formulaBean:'planSupplyFormula',     order:11, enabled:true},
+            {code:'PLAN_PURCHASE',   name:'计划采购',   parentCode:'PLAN_SUPPLY',    formulaBean:'planPurchaseFormula',   order:12, enabled:true},
+            {code:'PLAN_WORK',       name:'计划制造',   parentCode:'PLAN_SUPPLY',    formulaBean:'planWorkFormula',       order:13, enabled:true},
+            {code:'ENDING_STOCK',    name:'期末库存',   parentCode:null,             formulaBean:'endingStockFormula',    order:14, enabled:true},
+            {code:'SHORTAGE',        name:'缺料量',     parentCode:null,             formulaBean:'shortageFormula',       order:15, enabled:true},
+          ],
+          dimensionFields:[], measureFields:[],
+          filterFields:[
+            {code:'productId',    name:'物品',       fieldType:'TEXT', enumClass:'', required:false},
+            {code:'stockPointId', name:'库存点',     fieldType:'TEXT', enumClass:'', required:false},
+            {code:'startDate',    name:'查询起始日', fieldType:'DATE', enumClass:'', required:true},
+            {code:'endDate',      name:'查询结束日', fieldType:'DATE', enumClass:'', required:false},
+          ],
+        }
+      }
+    };
+  },
+  computed: {
+    filteredTemplates() {
+      if (!this.searchText) return this.templates;
+      return this.templates.filter(t => t.name.includes(this.searchText) || t.code.includes(this.searchText));
+    },
+    cur() { return this.tplData[this.activeTpl] || null; },
+  },
+  methods: {
+    selectTpl(code) { this.activeTpl=code; this.activeTab='engine'; this.expandedSeg=null; },
+    toggleSeg(code) { this.expandedSeg = this.expandedSeg===code ? null : code; },
+    saveAll() {
+      this.$notify({ title:'保存成功', message:`「${this.cur.name}」配置已保存`, type:'success', duration:2000 });
+    },
+    resetCur() { this.$message.info('已重置为上次保存状态（演示）'); },
+
+    // ---- 数据段 ----
+    openSegDialog(seg) {
+      if (seg) {
+        this.segMode = 'edit';
+        this.editingSegIndex = this.cur.segments.indexOf(seg);
+        const conds = { PLAN_SUPPLY: [], NON_PLAN_SUPPLY: [] };
+        if (seg.categoryConditions) {
+          Object.keys(seg.categoryConditions).forEach(k => { conds[k] = seg.categoryConditions[k].map(c=>({...c})); });
+        }
+        const maps = Object.entries(seg.fieldMappings||{}).map(([v,p])=>({virtualCol:v,physicalCol:p}));
+        this.segForm = { code:seg.code, label:seg.label, tableName:seg.tableName, categoryScope:[...seg.categoryScope], categoryConditions:conds, fieldMappings:maps, joinConfigs:[...(seg.joinConfigs||[])] };
+        this.detectedColumns = MOCK_COLUMNS[seg.tableName] || [];
+      } else {
+        this.segMode = 'add';
+        this.editingSegIndex = -1;
+        this.segForm = { code:'', label:'', tableName:'', categoryScope:[], categoryConditions:{PLAN_SUPPLY:[],NON_PLAN_SUPPLY:[]}, fieldMappings:JSON.parse(JSON.stringify(DEFAULT_MAPPINGS)), joinConfigs:[] };
+        this.detectedColumns = [];
+      }
+      this.segDialogVisible = true;
+    },
+    resetSegForm() { this.detectedColumns = []; },
+    detectColumns() {
+      this.detecting = true;
+      setTimeout(() => {
+        const cols = MOCK_COLUMNS[this.segForm.tableName] || ['id','item_code','stock_point_code','supply_date','quantity'];
+        this.detectedColumns = cols;
+        // 自动填充还不存在的映射行
+        cols.forEach(col => {
+          const exists = this.segForm.fieldMappings.some(m => m.physicalCol===col || m.virtualCol===col);
+          if (!exists && ['item_code','stock_point_code','supply_date','quantity'].includes(col)) {
+            const already = this.segForm.fieldMappings.find(m => m.virtualCol===col);
+            if (!already) this.segForm.fieldMappings.push({virtualCol:col, physicalCol:col});
+          }
+        });
+        this.detecting = false;
+        this.$message.success(`探测到 ${cols.length} 列（演示数据）`);
+      }, 600);
+    },
+    addCond(cat) {
+      if (!this.segForm.categoryConditions[cat]) this.$set(this.segForm.categoryConditions, cat, []);
+      this.segForm.categoryConditions[cat].push({field:'',op:'=',value:''});
+    },
+    removeCond(cat, idx) { this.segForm.categoryConditions[cat].splice(idx,1); },
+    saveSeg() {
+      if (!this.segForm.code || !this.segForm.label || !this.segForm.tableName) {
+        this.$message.error('段编码、段名称、来源表名均为必填');
+        return;
+      }
+      const conds = {};
+      this.segForm.categoryScope.forEach(cat => { conds[cat] = (this.segForm.categoryConditions[cat]||[]).map(c=>({...c})); });
+      const mappings = {};
+      this.segForm.fieldMappings.forEach(m => { if(m.virtualCol) mappings[m.virtualCol]=m.physicalCol||m.virtualCol; });
+      const seg = {
+        code: this.segForm.code, label: this.segForm.label, tableName: this.segForm.tableName,
+        enabled: true, categoryScope: [...this.segForm.categoryScope],
+        fieldMappings: mappings, categoryConditions: conds,
+        joinConfigs: this.segForm.joinConfigs.map(j=>({...j})),
+      };
+      if (this.segMode==='add') {
+        this.cur.segments.push(seg);
+        this.$message.success(`数据段「${seg.label}」已新增`);
+      } else {
+        this.$set(this.cur.segments, this.editingSegIndex, seg);
+        this.$message.success(`数据段「${seg.label}」已更新`);
+      }
+      this.segDialogVisible = false;
+      this.expandedSeg = seg.code;
+    },
+    deleteSeg(idx) {
+      this.$confirm(`确定删除数据段「${this.cur.segments[idx].label}」？`, '确认删除', {type:'warning'})
+        .then(()=>{ this.cur.segments.splice(idx,1); this.$message.success('已删除'); })
+        .catch(()=>{});
+    },
+
+    // ---- 指标排序 ----
+    startEditInd(code) { this.editingIndCode = code; },
+    moveInd(idx, dir) {
+      const arr = this.cur.indicators;
+      const ni = idx + dir;
+      if (ni<0 || ni>=arr.length) return;
+      const tmp = arr[idx]; this.$set(arr, idx, arr[ni]); this.$set(arr, ni, tmp);
+      arr[idx].order = idx+1; arr[ni].order = ni+1;
+    },
+
+    // ---- 维度 ----
+    openDimDialog(f, fi) {
+      if (f) { this.dimMode='edit'; this.editingDimIndex=fi; this.dimForm={...f}; }
+      else   { this.dimMode='add';  this.editingDimIndex=-1;  this.dimForm={code:'',name:'',isDefault:false,enumClass:''}; }
+      this.dimDialogVisible = true;
+    },
+    saveDim() {
+      if (!this.dimForm.code || !this.dimForm.name) { this.$message.error('字段编码和名称必填'); return; }
+      if (this.dimMode==='add') {
+        if (this.cur.dimensionFields.find(d=>d.code===this.dimForm.code)) { this.$message.error('字段编码已存在'); return; }
+        this.cur.dimensionFields.push({...this.dimForm});
+        this.$message.success('维度字段已新增');
+      } else {
+        this.$set(this.cur.dimensionFields, this.editingDimIndex, {...this.dimForm});
+        this.$message.success('维度字段已更新');
+      }
+      this.dimDialogVisible = false;
+    },
+    deleteDim(idx) {
+      this.$confirm(`确定删除维度「${this.cur.dimensionFields[idx].name}」？`,'确认删除',{type:'warning'})
+        .then(()=>{ this.cur.dimensionFields.splice(idx,1); this.$message.success('已删除'); }).catch(()=>{});
+    },
+
+    // ---- 度量 ----
+    openMeasureDialog() { this.measureForm={code:'',name:'',aggFunction:'SUM'}; this.measureDialogVisible=true; },
+    saveMeasure() {
+      if (!this.measureForm.code || !this.measureForm.name) { this.$message.error('字段编码和名称必填'); return; }
+      this.cur.measureFields.push({...this.measureForm});
+      this.$message.success('度量字段已新增');
+      this.measureDialogVisible = false;
+    },
+    deleteMeasure(idx) {
+      this.$confirm('确定删除该度量字段？','确认',{type:'warning'}).then(()=>{ this.cur.measureFields.splice(idx,1); }).catch(()=>{});
+    },
+
+    // ---- 筛选 ----
+    openFilterDialog(f, fi) {
+      if (f) { this.filterMode='edit'; this.editingFilterIndex=fi; this.filterForm={...f}; }
+      else   { this.filterMode='add';  this.editingFilterIndex=-1;  this.filterForm={code:'',name:'',fieldType:'TEXT',enumClass:'',required:false}; }
+      this.filterDialogVisible = true;
+    },
+    saveFilter() {
+      if (!this.filterForm.code || !this.filterForm.name) { this.$message.error('字段编码和名称必填'); return; }
+      if (this.filterMode==='add') {
+        this.cur.filterFields.push({...this.filterForm});
+        this.$message.success('筛选字段已新增');
+      } else {
+        this.$set(this.cur.filterFields, this.editingFilterIndex, {...this.filterForm});
+        this.$message.success('筛选字段已更新');
+      }
+      this.filterDialogVisible = false;
+    },
+    deleteFilter(idx) {
+      this.$confirm('确定删除该筛选字段？','确认',{type:'warning'}).then(()=>{ this.cur.filterFields.splice(idx,1); }).catch(()=>{});
+    },
+
+    // ---- 新建模板 ----
+    openNewTplDialog() { this.newTplForm={code:'',name:'',module:'SDS',engineType:'AGGREGATION'}; this.newTplDialogVisible=true; },
+    createTpl() {
+      if (!this.newTplForm.code||!this.newTplForm.name) { this.$message.error('模板编码和名称必填'); return; }
+      if (this.tplData[this.newTplForm.code]) { this.$message.error('模板编码已存在'); return; }
+      const t = {
+        code:this.newTplForm.code, name:this.newTplForm.name, module:this.newTplForm.module,
+        engineType:this.newTplForm.engineType, enabled:true,
+        columnAxisType:'MDS_FEIGN',
+        axisConfig:{feignBean:'mdsFeign',feignMethod:'getDefaultTimePeriods',timePeriodType:'LIMITED_CAPACITY_COMPUTING',periodEndMode:'END_OF_DAY',months:12},
+        segments:[], indicators:[], dimensionFields:[], measureFields:[], filterFields:[],
+      };
+      this.$set(this.tplData, t.code, t);
+      this.templates.push({code:t.code, name:t.name, module:t.module, engineType:t.engineType, enabled:true});
+      this.newTplDialogVisible = false;
+      this.selectTpl(t.code);
+      this.$message.success(`模板「${t.name}」已创建`);
+    },
+  }
+});
+</script>
+</body>
+</html>
