@@ -568,15 +568,36 @@
           </el-form-item>
         </el-col>
       </el-row>
-      <el-form-item label="来源表名" prop="tableName" :rules="[{required:true,message:'请填写表名'}]">
+      <el-form-item label="来源表名" prop="tableName" :rules="[{required:true,message:'请选择来源表'}]">
         <div style="display:flex;gap:8px;align-items:center">
-          <el-input v-model="segForm.tableName" style="width:260px" placeholder="如 sds_supply_custom" @input="detectedColumns=[]"></el-input>
-          <el-button size="mini" icon="el-icon-search" @click="detectColumns" :loading="detecting">探测列</el-button>
+          <el-select v-model="segForm.tableName" filterable style="width:320px" placeholder="从已注册的表中选择…"
+                     @change="onTableSelected">
+            <el-option v-for="t in registeredTables" :key="t.tableName"
+                       :value="t.tableName"
+                       :label="t.tableLabel + '（' + t.tableName + '）'"
+                       :disabled="!t.enabled">
+              <div style="display:flex;justify-content:space-between;align-items:center;width:100%">
+                <span>{{ t.tableLabel }}</span>
+                <span style="font-size:11px;color:#9ca3af;font-family:monospace">{{ t.tableName }}</span>
+              </div>
+            </el-option>
+          </el-select>
+          <el-button size="mini" icon="el-icon-search" @click="detectColumns" :loading="detecting"
+                     :disabled="!segForm.tableName">探测列</el-button>
+          <el-button size="mini" icon="el-icon-refresh" type="warning" plain
+                     @click="scanDialogVisible=true">扫描新表</el-button>
+        </div>
+        <div v-if="segForm.tableName" style="margin-top:6px">
+          <span v-if="getRegistryEntry(segForm.tableName)" class="badge" style="font-size:11px"
+                :class="getRegistryEntry(segForm.tableName).source==='SDK'?'badge-agg':'badge-ok'">
+            <i :class="getRegistryEntry(segForm.tableName).source==='SDK'?'fas fa-cube':'fas fa-building'"></i>
+            {{ getRegistryEntry(segForm.tableName).source==='SDK'?'产品预置':'项目注册' }}
+          </span>
         </div>
         <div v-if="detectedColumns.length" class="col-list-wrap">
           <span v-for="c in detectedColumns" :key="c" class="col-chip">{{ c }}</span>
         </div>
-        <div class="section-note">探测列会读取 information_schema，自动辅助填充字段映射</div>
+        <div class="section-note">从已注册表中选择；若项目新增了表，点击「扫描新表」发现并注册</div>
       </el-form-item>
       <el-form-item label="参与分类">
         <el-checkbox-group v-model="segForm.categoryScope">
@@ -715,6 +736,51 @@
     </span>
   </el-dialog>
 
+  <!-- ============ 扫描新表 Dialog ============ -->
+  <el-dialog title="扫描数据库新表" :visible.sync="scanDialogVisible" width="620px">
+    <div class="tip-bar tip-info" style="margin-bottom:14px">
+      <i class="fas fa-info-circle"></i>
+      <span>从 <code>information_schema.TABLES</code> 扫描符合模块命名规则的表，列出尚未注册的候选表。勾选后点击「注册选中表」即可加入可用表列表。</span>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:14px;align-items:center">
+      <el-select v-model="scanPrefix" size="small" style="width:200px" placeholder="命名前缀">
+        <el-option value="sds_ord_" label="sds_ord_%（订单类）"></el-option>
+        <el-option value="sds_sup_" label="sds_sup_%（供应类）"></el-option>
+        <el-option value="sds_" label="sds_%（SDS 全部）"></el-option>
+      </el-select>
+      <el-button size="small" type="primary" icon="el-icon-search" @click="doScanTables" :loading="scanning">开始扫描</el-button>
+    </div>
+    <el-table :data="scanResults" size="small" border v-if="scanResults.length"
+              @selection-change="scanSelection=$event" max-height="320">
+      <el-table-column type="selection" width="45"></el-table-column>
+      <el-table-column label="表名" prop="tableName" width="260">
+        <template slot-scope="{row}"><code style="font-size:12px">{{ row.tableName }}</code></template>
+      </el-table-column>
+      <el-table-column label="状态" width="100">
+        <template slot-scope="{row}">
+          <el-tag v-if="row.registered" size="mini" type="info">已注册</el-tag>
+          <el-tag v-else size="mini" type="warning">未注册</el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column label="行数（估）" prop="rowCount" width="100"></el-table-column>
+      <el-table-column label="注册名称" min-width="150">
+        <template slot-scope="{row}">
+          <el-input v-if="!row.registered" v-model="row.label" size="mini" placeholder="中文名称"></el-input>
+          <span v-else style="color:#9ca3af">{{ row.label }}</span>
+        </template>
+      </el-table-column>
+    </el-table>
+    <div v-if="scanResults.length===0 && scanDone" class="empty-tip" style="padding:20px">
+      <i class="fas fa-check-circle" style="color:#10b981;font-size:20px"></i>
+      <p style="margin-top:8px">所有匹配的表均已注册，没有新表需要添加。</p>
+    </div>
+    <span slot="footer">
+      <el-button size="small" @click="scanDialogVisible=false">关闭</el-button>
+      <el-button size="small" type="primary" @click="registerScanned"
+                 :disabled="!scanSelection.length">注册选中表（{{ scanSelection.length }}）</el-button>
+    </span>
+  </el-dialog>
+
 </div><!-- /#app -->
 
 <script src="https://unpkg.com/vue@2/dist/vue.js"></script>
@@ -727,7 +793,23 @@ const MOCK_COLUMNS = {
   'sds_sup_boh_stock':             ['id','item_code','stock_point_code','available_date','quantity','version_id','status'],
   'sds_sup_purchase_forecast_stock':['id','item_code','stock_point_code','supply_date','quantity','source','forecast_no'],
   'sds_supply_universal':          ['id','item_code','stock_point_code','supply_date','quantity','supply_type','remark'],
+  'sds_supply_custom':             ['id','item_code','stock_point_code','supply_date','quantity','custom_type','batch_no'],
+  'sds_ord_sales_outbound':        ['id','item_code','stock_point_code','outbound_date','quantity','sales_order_no','customer_code'],
 };
+// 模拟 information_schema 扫描会发现的全部 sds 表
+const ALL_SDS_TABLES = [
+  'sds_ord_purchase_order','sds_ord_work_order','sds_ord_transport_order',
+  'sds_sup_boh_stock','sds_sup_purchase_forecast_stock','sds_supply_universal',
+  'sds_supply_custom','sds_ord_sales_outbound','sds_ord_operation','sds_peg_supply','sds_peg_demand',
+];
+const INITIAL_REGISTRY = [
+  {tableName:'sds_ord_purchase_order',       tableLabel:'采购订单',     tableType:'SUPPLY', source:'SDK',     enabled:true},
+  {tableName:'sds_ord_work_order',           tableLabel:'制造订单',     tableType:'SUPPLY', source:'SDK',     enabled:true},
+  {tableName:'sds_ord_transport_order',      tableLabel:'运输订单',     tableType:'SUPPLY', source:'SDK',     enabled:true},
+  {tableName:'sds_sup_boh_stock',            tableLabel:'期初库存',     tableType:'STOCK',  source:'SDK',     enabled:true},
+  {tableName:'sds_sup_purchase_forecast_stock',tableLabel:'采购在途',   tableType:'SUPPLY', source:'SDK',     enabled:true},
+  {tableName:'sds_supply_universal',         tableLabel:'通用供应',     tableType:'SUPPLY', source:'SDK',     enabled:true},
+];
 const DEFAULT_MAPPINGS = [
   {virtualCol:'item_code',        physicalCol:'item_code'},
   {virtualCol:'stock_point_code', physicalCol:'stock_point_code'},
@@ -767,6 +849,15 @@ new Vue({
       // 新建模板 dialog
       newTplDialogVisible: false,
       newTplForm: { code:'', name:'', module:'SDS', engineType:'AGGREGATION' },
+      // 表注册
+      registeredTables: JSON.parse(JSON.stringify(INITIAL_REGISTRY)),
+      // 扫描新表 dialog
+      scanDialogVisible: false,
+      scanPrefix: 'sds_',
+      scanning: false,
+      scanDone: false,
+      scanResults: [],
+      scanSelection: [],
 
       templates: [
         { code:'SUPPLY_SUMMARY',       name:'供应汇总',     module:'SDS', engineType:'AGGREGATION',    enabled:true },
@@ -1031,6 +1122,61 @@ new Vue({
       this.newTplDialogVisible = false;
       this.selectTpl(t.code);
       this.$message.success(`模板「${t.name}」已创建`);
+    },
+
+    // ---- 表注册与扫描 ----
+    getRegistryEntry(tableName) {
+      return this.registeredTables.find(t => t.tableName === tableName);
+    },
+    onTableSelected(tableName) {
+      this.detectedColumns = [];
+      // 自动填充段名称（如果为空）
+      const entry = this.getRegistryEntry(tableName);
+      if (entry && !this.segForm.label) {
+        this.segForm.label = entry.tableLabel;
+      }
+    },
+    doScanTables() {
+      this.scanning = true;
+      this.scanDone = false;
+      setTimeout(() => {
+        const prefix = this.scanPrefix;
+        const registeredNames = this.registeredTables.map(t => t.tableName);
+        this.scanResults = ALL_SDS_TABLES
+          .filter(t => t.startsWith(prefix))
+          .map(t => ({
+            tableName: t,
+            registered: registeredNames.includes(t),
+            label: registeredNames.includes(t)
+              ? this.registeredTables.find(r => r.tableName === t).tableLabel
+              : '',
+            rowCount: Math.floor(Math.random() * 50000) + 100,
+          }))
+          .sort((a, b) => a.registered - b.registered); // 未注册的排前面
+        this.scanning = false;
+        this.scanDone = true;
+        this.scanSelection = [];
+        const newCount = this.scanResults.filter(r => !r.registered).length;
+        this.$message.success(`扫描完成：发现 ${this.scanResults.length} 张表，其中 ${newCount} 张未注册`);
+      }, 800);
+    },
+    registerScanned() {
+      const toRegister = this.scanSelection.filter(r => !r.registered);
+      if (!toRegister.length) { this.$message.warning('所选表已全部注册'); return; }
+      const missing = toRegister.filter(r => !r.label);
+      if (missing.length) { this.$message.error(`请为以下表填写中文名称：${missing.map(r=>r.tableName).join('、')}`); return; }
+      toRegister.forEach(r => {
+        this.registeredTables.push({
+          tableName: r.tableName,
+          tableLabel: r.label,
+          tableType: 'SUPPLY',
+          source: 'PROJECT',
+          enabled: true,
+        });
+        r.registered = true;
+      });
+      this.$message.success(`已注册 ${toRegister.length} 张表`);
+      this.scanSelection = [];
     },
   }
 });
