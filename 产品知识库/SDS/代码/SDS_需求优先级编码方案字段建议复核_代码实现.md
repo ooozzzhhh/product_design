@@ -2,7 +2,7 @@
 
 - **更新时间**：2026-03-24
 - **本次调研范围**：SDS 需求优先级编码方案（加权求和）评分组弹窗；重点覆盖 `PriorityFactorConfigServiceImpl`、`FactorSourceTableEnum`、`FactorSourceTableProvider` 及其实现类、`PriorityCalculatorAssembledDomainServiceImpl`、前端 `priorityScoringRuleConfigurationDialog.vue`，并结合测试库 `scp_mps` / `scp_mds` 的相关表与视图复核。**产品已拍板的参与计算因子白名单见本文 §5（执行以 §5 为准）。**
-- **代码来源**：`C:\Users\OZH\Desktop\UHA\scp-foundation`
+- **代码来源**：`scp-foundation/`（相对工作区根）
 
 ---
 
